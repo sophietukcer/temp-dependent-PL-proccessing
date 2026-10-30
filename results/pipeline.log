@@ -1,0 +1,39 @@
+[2026-10-30 16:29:31] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 16:29:31] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 9 sample spectra with shared background and calibration files.
+[2026-10-30 16:36:45] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 16:36:45] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 16:36:46] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 16:41:27] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 16:41:27] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 16:41:27] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 16:42:22] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 4 peaks) ---
+[2026-10-30 16:43:36] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 3 peaks RETAINED; extra peak not statistically justified.
+[2026-10-30 16:43:36] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-10-30 16:44:07] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-10-30 16:53:57] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 16:53:57] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 16:53:57] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 16:54:59] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 4 peaks) ---
+[2026-10-30 16:56:26] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 3 peaks RETAINED; extra peak not statistically justified.
+[2026-10-30 16:56:26] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-10-30 16:56:57] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-10-30 17:08:28] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 17:08:28] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 17:08:28] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 17:09:59] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 17:09:59] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 17:09:59] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 17:12:34] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 17:12:34] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 17:12:34] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 17:13:36] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 4 peaks) ---
+[2026-10-30 17:14:50] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 4 peaks PREFERRED based on BIC drop (ΔBIC < -10).
+[2026-10-30 17:14:50] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-10-30 17:15:41] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-10-30 17:23:08] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-30 17:23:08] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-30 17:23:09] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 3 peaks) ---
+[2026-10-30 17:24:09] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 4 peaks) ---
+[2026-10-30 17:25:24] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 4 peaks PREFERRED based on BIC drop (ΔBIC < -10).
+[2026-10-30 17:25:24] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-10-30 17:26:17] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results

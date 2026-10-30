@@ -7,7 +7,7 @@ MCMC sampling using emcee for temperature-dependent PL peak analysis.
 
 import logging
 import multiprocessing
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 
 import emcee
 import numpy as np
@@ -21,79 +21,63 @@ def log_prior(
     params: np.ndarray,
     num_peaks: int,
     absorption_centers: List[float],
-    center_window_ev: float = 0.15,
+    center_window_ev: float = 0.015,  # Narrowed to 15 meV to prevent label switching
 ) -> float:
-    """ Computes the log-prior probability density for physical temperature-dependent peak parameters.
+    """ Calculates joint log-prior probability density enforcing physical parameter domain boundaries, peak energy ordering, and anchored center priors.
     ------
-    OUTPUT - float: Calculated log-prior probability density (0.0 or prior density value if valid, -np.inf if outside bounds).
+    OUTPUT - float: Natural log-prior probability density (returns -np.inf for unphysical or out-of-bound parameters).
     ------
-    params - np.ndarray: Flat parameter vector of length (9 * num_peaks + 1) containing physical parameters and log_sigma.
-    num_peaks - int: Number of peaks comprising the physical model.
-    absorption_centers - List[float]: Initial peak position energy estimates in eV derived from absorption spectra.
-    center_window_ev - float: Maximum allowed deviation (eV) from absorption center for initial peak position E_0(0).
-    ------
-    ValueError: Raised if params length does not match (9 * num_peaks + 1) or absorption_centers count does not equal num_peaks.
+    params - np.ndarray: Joint model parameter vector of shape (9 * num_peaks + 1,).
+    num_peaks - int: Number of emission peaks comprising the composite physics model.
+    absorption_centers - List[float]: Expected peak center target energies in eV derived from absorption measurements.
+    sigma_center - float: Standard deviation in eV for Gaussian prior anchoring peak centers E0(0) to absorption targets (default: 0.015).
+    
     """
-    expected_param_count = 9 * num_peaks + 1
-    if len(params) != expected_param_count:
-        logger.error(
-            "Parameter count mismatch in log_prior: expected %d, got %d",
-            expected_param_count,
-            len(params),
-        )
-        raise ValueError(
-            f"Expected {expected_param_count} parameters for {num_peaks} peaks, got {len(params)}."
-        )
-
-    if len(absorption_centers) != num_peaks:
-        logger.error(
-            "Absorption centers count (%d) does not match num_peaks (%d)",
-            len(absorption_centers),
-            num_peaks,
-        )
-        raise ValueError("Length of absorption_centers must equal num_peaks.")
-
-    log_prior_val = 0.0
-
-    for k in range(num_peaks):
-        peak_params = params[k * 9 : (k + 1) * 9]
-        gamma_0, gamma_ac, gamma_lo, e_lo, i_0, a_factor, e_a, e_0_zero, alpha_coeff = peak_params
-        center_target = absorption_centers[k]
-
-        # Linewidth bounds (eV and eV/K)
-        if not (0.001 <= gamma_0 <= 0.5):
-            return -np.inf
-        if not (0.0 <= gamma_ac <= 0.01):
-            return -np.inf
-        if not (0.0 <= gamma_lo <= 0.5):
-            return -np.inf
-        if not (0.005 <= e_lo <= 0.2):
-            return -np.inf
-
-        # Thermal Quenching bounds
-        if not (0.0 < i_0 <= 500.0):
-            return -np.inf
-        if not (0.0 <= a_factor <= 1e7):
-            return -np.inf
-        if not (0.001 <= e_a <= 2.0):
-            return -np.inf
-
-        # Peak Center Energy bounds (eV) and Bandgap Shift Coefficient (eV/K)
-        if not (center_target - center_window_ev <= e_0_zero <= center_target + center_window_ev):
-            return -np.inf
-        if not (-0.002 <= alpha_coeff <= 0.002):
-            return -np.inf
-
-        # Informative Gaussian prior anchoring peak center at 0 K to absorption estimate
-        sigma_center = center_window_ev / 3.0
-        log_prior_val += -0.5 * ((e_0_zero - center_target) / sigma_center) ** 2
-
-    # Residual noise log_sigma bounds
-    log_sigma = params[-1]
-    if not (-10.0 <= log_sigma <= 1.0):
+    expected_ndim = 9 * num_peaks + 1
+    if len(params) != expected_ndim:
         return -np.inf
 
-    return float(log_prior_val)
+    lp = 0.0
+
+    # 1. Enforce strict peak energy ordering (Peak 1 < Peak 2 < Peak 3...)
+    for k in range(num_peaks - 1):
+        e0_current = params[k * 9 + 7]
+        e0_next = params[(k + 1) * 9 + 7]
+        if e0_current >= e0_next:
+            return -np.inf
+
+    # 2. Per-peak parameter boundary checks and Gaussian center priors
+    for k in range(num_peaks):
+        g0, g_ac, g_lo, e_lo, i0, a_fac, e_a, e0, alpha = params[k * 9 : (k + 1) * 9]
+
+        # Uniform physical domain boundaries
+        if not (0.001 <= g0 <= 0.2):
+            return -np.inf
+        if not (1e-6 <= g_ac <= 1e-2):
+            return -np.inf
+        if not (0.001 <= g_lo <= 0.2):
+            return -np.inf
+        if not (0.005 <= e_lo <= 0.1):
+            return -np.inf
+        if not (1e-4 <= i0 <= 10.0):
+            return -np.inf
+        if not (1e-3 <= a_fac <= 1e4):
+            return -np.inf
+        if not (0.001 <= e_a <= 0.5):
+            return -np.inf
+        if not (1e-7 <= alpha <= 1e-3):
+            return -np.inf
+
+        # Gaussian prior anchored near expected absorption center
+        target_center = absorption_centers[k]
+        lp += -0.5 * ((e0 - target_center) / center_window_ev) ** 2
+
+    # 3. Log residual variance boundary check
+    log_sigma = params[-1]
+    if not (-10.0 <= log_sigma <= 2.0):
+        return -np.inf
+
+    return lp
 
 
 def log_likelihood(
@@ -179,23 +163,41 @@ def log_posterior(
     return float(lp + ll)
 
 
+DEFAULT_PEAK_GUESSES: Dict[str, float] = {
+    "gamma_0": 0.04,     # Inhomogeneous broadening at 0 K (eV)
+    "gamma_ac": 1e-4,    # Acoustic phonon coupling (eV/K)
+    "gamma_lo": 0.03,    # LO phonon coupling (eV)
+    "e_lo": 0.025,       # LO phonon energy (eV)
+    "i_0": 0.1,          # Peak area at 0 K
+    "a_factor": 10.0,    # Quenching pre-factor
+    "e_a": 0.03,         # Quenching activation energy (eV)
+    "alpha_coeff": 1e-5, # Bandgap temperature shift (eV/K)
+}
+
+
 def initialize_walker_positions(
     num_walkers: int,
     num_peaks: int,
     absorption_centers: List[float],
+    custom_peak_guesses: Optional[List[Dict[str, float]]] = None,
+    log_sigma_guess: float = -3.0,
     jitter_std: float = 1e-3,
 ) -> np.ndarray:
-    """ Generates initial parameter walker starting positions centered around physically plausible guesses with Gaussian noise jitter.
+    """ Generates initial parameter walker starting positions using configurable parameter guesses with Gaussian jitter.
     ------
     OUTPUT - np.ndarray: Walker starting array of shape (num_walkers, 9 * num_peaks + 1).
     ------
     num_walkers - int: Total number of ensemble MCMC walkers.
     num_peaks - int: Number of peaks comprising the model.
     absorption_centers - List[float]: Absorption peak center estimates in eV.
+    custom_peak_guesses - Optional[List[Dict[str, float]]]: Optional list of dicts specifying per-peak initial guesses.
+    log_sigma_guess - float: Initial guess for log residual noise variance (default: -3.0).
     jitter_std - float: Relative standard deviation of Gaussian noise jitter applied to initial parameters.
     ------
-    ValueError: Raised if num_walkers is less than twice the parameter dimension.
+    ValueError: Raised if num_walkers is less than twice parameter dimensions or custom_peak_guesses length doesn't match num_peaks.
     """
+
+
     ndim = 9 * num_peaks + 1
     min_walkers = 2 * ndim
     if num_walkers < min_walkers:
@@ -208,28 +210,53 @@ def initialize_walker_positions(
             f"num_walkers ({num_walkers}) must be at least twice the parameter count ({min_walkers})."
         )
 
+    if custom_peak_guesses is not None and len(custom_peak_guesses) != num_peaks:
+        logger.error(
+            "custom_peak_guesses length (%d) does not match num_peaks (%d)",
+            len(custom_peak_guesses),
+            num_peaks,
+        )
+        raise ValueError("Length of custom_peak_guesses must equal num_peaks.")
+
     base_guess: List[float] = []
     for k in range(num_peaks):
+        peak_dict = (
+            custom_peak_guesses[k]
+            if custom_peak_guesses is not None
+            else DEFAULT_PEAK_GUESSES
+        )
+
+        gamma_0 = peak_dict.get("gamma_0", DEFAULT_PEAK_GUESSES["gamma_0"])
+        gamma_ac = peak_dict.get("gamma_ac", DEFAULT_PEAK_GUESSES["gamma_ac"])
+        gamma_lo = peak_dict.get("gamma_lo", DEFAULT_PEAK_GUESSES["gamma_lo"])
+        e_lo = peak_dict.get("e_lo", DEFAULT_PEAK_GUESSES["e_lo"])
+        i_0 = peak_dict.get("i_0", DEFAULT_PEAK_GUESSES["i_0"])
+        a_factor = peak_dict.get("a_factor", DEFAULT_PEAK_GUESSES["a_factor"])
+        e_a = peak_dict.get("e_a", DEFAULT_PEAK_GUESSES["e_a"])
+        alpha_coeff = peak_dict.get("alpha_coeff", DEFAULT_PEAK_GUESSES["alpha_coeff"])
+
         base_guess.extend([
-            0.04,                  # gamma_0 (eV)
-            1e-4,                  # gamma_ac (eV/K)
-            0.03,                  # gamma_lo (eV)
-            0.025,                 # e_lo (eV)
-            0.1,                   # i_0
-            10.0,                  # a_factor
-            0.03,                  # e_a (eV)
-            absorption_centers[k], # e_0_zero (eV)
-            1e-5,                  # alpha_coeff (eV/K)
+            gamma_0,
+            gamma_ac,
+            gamma_lo,
+            e_lo,
+            i_0,
+            a_factor,
+            e_a,
+            absorption_centers[k],
+            alpha_coeff,
         ])
-    base_guess.append(-3.0)  # log_sigma initial guess
+
+    base_guess.append(log_sigma_guess)
 
     initial_pos = np.array(base_guess, dtype=np.float64)
     walker_positions = initial_pos + jitter_std * np.random.randn(num_walkers, ndim) * np.abs(initial_pos)
 
-    # Re-sample any walkers that fall outside physical prior bounds
+
     for i in range(num_walkers):
         while not np.isfinite(log_prior(walker_positions[i], num_peaks, absorption_centers)):
-            walker_positions[i] = initial_pos + jitter_std * np.random.randn(ndim) * np.abs(initial_pos)
+            # walker_positions[i] = initial_pos + jitter_std * np.random.randn(ndim) * np.abs(initial_pos)
+            walker_positions[i] = initial_pos + 1e-4 * np.random.randn(ndim) * np.abs(initial_pos)
 
     logger.info("Initialized %d walkers for %d dimensions (%d peaks)", num_walkers, ndim, num_peaks)
     return walker_positions
@@ -239,6 +266,7 @@ def run_mcmc_sampling(
     processed_series: List[Dict[str, Union[float, np.ndarray]]],
     num_peaks: int,
     absorption_centers: List[float],
+    custom_peak_guesses: Optional[List[Dict[str, float]]] = None,
     n_walkers: int = 60,
     n_steps: int = 3000,
     burn_in: int = 1000,
@@ -251,6 +279,7 @@ def run_mcmc_sampling(
     processed_series - List[Dict[str, Union[float, np.ndarray]]]: Processed temperature series dataset dicts.
     num_peaks - int: Number of emission peaks to fit.
     absorption_centers - List[float]: Initial peak position energy targets in eV.
+    custom_peak_guesses - Optional[List[Dict[str, float]]]: Optional list of dicts specifying initial guesses per peak.
     n_walkers - int: Number of ensemble walkers (default: 60).
     n_steps - int: Total sampling steps per walker (default: 3000).
     burn_in - int: Number of initial steps to discard as burn-in (default: 1000).
@@ -263,7 +292,12 @@ def run_mcmc_sampling(
         raise ValueError("n_steps must be strictly greater than burn_in steps.")
 
     ndim = 9 * num_peaks + 1
-    init_positions = initialize_walker_positions(n_walkers, num_peaks, absorption_centers)
+    init_positions = initialize_walker_positions(
+        n_walkers,
+        num_peaks,
+        absorption_centers,
+        custom_peak_guesses=custom_peak_guesses,
+    )
     log_prob_args = (processed_series, num_peaks, absorption_centers)
 
     logger.info(

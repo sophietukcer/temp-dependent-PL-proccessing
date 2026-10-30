@@ -8,6 +8,7 @@ curves, and MCMC posterior probability corner plots.
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+import emcee
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -267,5 +268,59 @@ def plot_parameter_temperature_trends(
         path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(path, dpi=300)
         logger.info("Saved parameter temperature trends plot to: %s", path)
+
+    return fig
+
+def plot_mcmc_traceplots(
+    sampler: emcee.EnsembleSampler,
+    num_peaks: int,
+    burn_in: Optional[int] = None,
+    save_path: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """ Generates walker traceplots showing parameter evolution over step iterations to diagnose MCMC convergence.
+    ------
+    OUTPUT - plt.Figure: Matplotlib figure containing trace subplots for each parameter.
+    ------
+    sampler - emcee.EnsembleSampler: Fitted emcee EnsembleSampler instance containing full chain history.
+    num_peaks - int: Number of emission peaks fitted.
+    burn_in - Optional[int]: Step iteration marking burn-in cutoff (drawn as a vertical dashed line).
+    save_path - Optional[Union[str, Path]]: Path to save generated figure image file.
+    """
+    # Extract full chain without discarding burn-in: shape is (n_steps, n_walkers, ndim)
+    chain = sampler.get_chain()
+    n_steps, n_walkers, ndim = chain.shape
+
+    # Construct parameter labels
+    labels: List[str] = []
+    for k in range(num_peaks):
+        labels.extend([f"{lbl} (P{k+1})" for lbl in PARAM_NAMES_PER_PEAK])
+    labels.append(r"$\ln \sigma$")
+
+    fig, axes = plt.subplots(ndim, 1, figsize=(12, 1.8 * ndim), sharex=True)
+    if ndim == 1:
+        axes = [axes]
+
+    for i in range(ndim):
+        ax = axes[i]
+        # Plot every walker's path over time
+        ax.plot(chain[:, :, i], "k-", alpha=0.15, lw=0.5)
+        ax.set_ylabel(labels[i], fontsize=10)
+        ax.grid(True, alpha=0.3)
+
+        if burn_in is not None:
+            ax.axvline(x=burn_in, color="red", linestyle="--", lw=1.2, label="Burn-in Cutoff" if i == 0 else "")
+
+    axes[-1].set_xlabel("Step Number", fontsize=12)
+    axes[0].set_title(f"MCMC Walker Traceplots ({n_walkers} Walkers, {n_steps} Steps)", fontsize=14)
+    if burn_in is not None:
+        axes[0].legend(loc="upper right")
+
+    plt.tight_layout()
+
+    if save_path:
+        path = Path(save_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(path, dpi=300)
+        logger.info("Saved traceplots to: %s", path)
 
     return fig
