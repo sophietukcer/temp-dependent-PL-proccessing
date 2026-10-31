@@ -82,3 +82,20 @@
 [2026-10-31 20:43:24] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 4 peaks RETAINED; extra peak not statistically justified.
 [2026-10-31 20:43:24] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
 [2026-10-31 20:44:48] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-10-31 21:23:28] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-31 21:23:28] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-31 21:23:28] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-10-31 21:30:35] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-31 21:30:35] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-31 21:30:35] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-10-31 21:35:30] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 5 peaks) ---
+[2026-10-31 21:40:34] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 5 peaks PREFERRED based on BIC drop (ΔBIC < -10).
+[2026-10-31 21:40:34] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-10-31 21:42:39] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-10-31 21:47:51] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-10-31 21:47:51] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-10-31 21:47:51] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-10-31 21:56:44] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 5 peaks) ---
+[2026-10-31 22:06:40] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 4 peaks RETAINED; extra peak not statistically justified.
+[2026-10-31 22:06:40] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-10-31 22:08:39] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results

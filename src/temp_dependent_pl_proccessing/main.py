@@ -263,7 +263,7 @@ if __name__ == "__main__":
         test_additional_peak=True,
         output_dir="results",
         n_walkers=200,
-        n_steps=10000,
-        burn_in=3000,
+        n_steps=20000,
+        burn_in=6000,
         use_parallel=True,
     )
