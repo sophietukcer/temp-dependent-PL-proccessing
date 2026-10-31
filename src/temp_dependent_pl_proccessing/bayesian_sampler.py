@@ -12,7 +12,7 @@ from typing import Dict, List, Tuple, Union, Optional
 import emcee
 import numpy as np
 
-from physics import evaluate_composite_spectrum
+from temp_dependent_pl_proccessing.physics import evaluate_composite_spectrum
 
 logger = logging.getLogger("pl_analysis.bayesian_sampler")
 
@@ -39,31 +39,31 @@ def log_prior(
 
     lp = 0.0
 
-    # 1. Enforce strict peak energy ordering (Peak 1 < Peak 2 < Peak 3...)
+    # Enforce strict peak energy ordering (Peak 1 < Peak 2 < Peak 3...)
     for k in range(num_peaks - 1):
         e0_current = params[k * 9 + 7]
         e0_next = params[(k + 1) * 9 + 7]
         if e0_current >= e0_next:
             return -np.inf
 
-    # 2. Per-peak parameter boundary checks and Gaussian center priors
+    # Per-peak parameter boundary checks and Gaussian center priors
     for k in range(num_peaks):
         g0, g_ac, g_lo, e_lo, i0, a_fac, e_a, e0, alpha = params[k * 9 : (k + 1) * 9]
 
         # Uniform physical domain boundaries
-        if not (0.001 <= g0 <= 0.2):
+        if not (0.001 <= g0 <= 1):
             return -np.inf
         if not (1e-6 <= g_ac <= 1e-2):
             return -np.inf
-        if not (0.001 <= g_lo <= 0.2):
+        if not (0.001 <= g_lo <= 1):
             return -np.inf
-        if not (0.005 <= e_lo <= 0.1):
+        if not (0.005 <= e_lo <= 0.5):
             return -np.inf
-        if not (1e-4 <= i0 <= 10.0):
+        if not (1e-5 <= i0 <= 10.0):
             return -np.inf
         if not (1e-3 <= a_fac <= 1e4):
             return -np.inf
-        if not (0.001 <= e_a <= 0.5):
+        if not (0.001 <= e_a <= 1):
             return -np.inf
         if not (1e-7 <= alpha <= 1e-3):
             return -np.inf
@@ -72,7 +72,7 @@ def log_prior(
         target_center = absorption_centers[k]
         lp += -0.5 * ((e0 - target_center) / center_window_ev) ** 2
 
-    # 3. Log residual variance boundary check
+    # Log residual variance boundary check
     log_sigma = params[-1]
     if not (-10.0 <= log_sigma <= 2.0):
         return -np.inf
@@ -138,7 +138,7 @@ def log_posterior(
     processed_series: List[Dict[str, Union[float, np.ndarray]]],
     num_peaks: int,
     absorption_centers: List[float],
-    center_window_ev: float = 0.15,
+    center_window_ev: float = 0.08,
 ) -> float:
     """ Computes the total log-posterior probability density by summing log-prior and joint log-likelihood.
     ------
@@ -168,9 +168,9 @@ DEFAULT_PEAK_GUESSES: Dict[str, float] = {
     "gamma_ac": 1e-4,    # Acoustic phonon coupling (eV/K)
     "gamma_lo": 0.03,    # LO phonon coupling (eV)
     "e_lo": 0.025,       # LO phonon energy (eV)
-    "i_0": 0.1,          # Peak area at 0 K
+    "i_0": 0.01,          # Peak area at 0 K
     "a_factor": 10.0,    # Quenching pre-factor
-    "e_a": 0.03,         # Quenching activation energy (eV)
+    "e_a": 0.05,         # Quenching activation energy (eV)
     "alpha_coeff": 1e-5, # Bandgap temperature shift (eV/K)
 }
 
@@ -181,7 +181,7 @@ def initialize_walker_positions(
     absorption_centers: List[float],
     custom_peak_guesses: Optional[List[Dict[str, float]]] = None,
     log_sigma_guess: float = -3.0,
-    jitter_std: float = 1e-3,
+    jitter_std: float = 1e-4,
 ) -> np.ndarray:
     """ Generates initial parameter walker starting positions using configurable parameter guesses with Gaussian jitter.
     ------
@@ -327,6 +327,7 @@ def run_mcmc_sampling(
             ndim,
             log_posterior,
             args=log_prob_args,
+            a=1.2,
         )
         sampler.run_mcmc(init_positions, n_steps, progress=True)
 

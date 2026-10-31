@@ -9,7 +9,7 @@ from typing import Dict, List, Union
 import numpy as np
 import pytest
 
-from bayesian_sampler import (
+from temp_dependent_pl_proccessing.bayesian_sampler import (
     initialize_walker_positions,
     log_likelihood,
     log_posterior,

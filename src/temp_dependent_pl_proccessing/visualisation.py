@@ -18,7 +18,7 @@ try:
 except ImportError:
     corner = None
 
-from physics import (
+from temp_dependent_pl_proccessing.physics import (
     calculate_linewidth,
     calculate_peak_area,
     calculate_peak_center,

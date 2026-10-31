@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from data_loader import (
+from temp_dependent_pl_proccessing.data_loader import (
     convert_wavelength_to_energy,
     extract_temperature,
     interpolate_calibration,
@@ -57,7 +57,7 @@ def test_interpolate_calibration():
 
 
 def test_convert_wavelength_to_energy():
-    """ Verifies Jacobian transformation math: E = hc / λ and I(E) = I(λ) * λ^2 / hc.
+    """ Verifies Jacobian transformation maths: E = hc / λ and I(E) = I(λ) * λ^2 / hc.
     """
     hc = 1239.842
     wv = np.array([620.0, 310.0])  # ~2.0 eV and ~4.0 eV

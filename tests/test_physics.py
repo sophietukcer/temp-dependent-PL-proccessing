@@ -8,7 +8,7 @@ bandgap center shifts, Gaussian peak shapes, and multi-peak composite models.
 import numpy as np
 import pytest
 
-from physics import (
+from temp_dependent_pl_proccessing.physics import (
     calculate_linewidth,
     calculate_peak_area,
     calculate_peak_center,

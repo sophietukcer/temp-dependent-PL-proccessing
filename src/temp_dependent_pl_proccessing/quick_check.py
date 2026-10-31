@@ -11,9 +11,9 @@ from typing import List, Union
 import matplotlib.pyplot as plt
 import numpy as np
 
-from data_loader import process_single_dataset
-from logger_config import setup_logger
-from physics import evaluate_composite_spectrum
+from temp_dependent_pl_proccessing.data_loader import process_single_dataset
+from temp_dependent_pl_proccessing.logger_config import setup_logger
+from temp_dependent_pl_proccessing.physics import evaluate_composite_spectrum
 
 
 def run_quick_check(

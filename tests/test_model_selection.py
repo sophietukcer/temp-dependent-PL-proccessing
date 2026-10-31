@@ -8,7 +8,7 @@ from typing import Dict, List, Union
 import numpy as np
 import pytest
 
-from model_selection import (
+from temp_dependent_pl_proccessing.model_selection import (
     compute_aic,
     compute_bic,
     compute_total_data_points,

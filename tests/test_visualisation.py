@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from visualisation import (
+from temp_dependent_pl_proccessing.visualisation import (
     plot_corner_posterior,
     plot_parameter_temperature_trends,
     plot_temperature_series_fits,

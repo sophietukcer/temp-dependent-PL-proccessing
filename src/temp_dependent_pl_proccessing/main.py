@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
-from bayesian_sampler import run_mcmc_sampling
-from data_loader import process_temperature_series
-from logger_config import setup_logger
-from model_selection import evaluate_model_fit, justify_peak_addition
-from visualisation import (
+from temp_dependent_pl_proccessing.bayesian_sampler import run_mcmc_sampling
+from temp_dependent_pl_proccessing.data_loader import process_temperature_series
+from temp_dependent_pl_proccessing.logger_config import setup_logger
+from temp_dependent_pl_proccessing.model_selection import evaluate_model_fit, justify_peak_addition
+from temp_dependent_pl_proccessing.visualisation import (
     plot_corner_posterior,
     plot_parameter_temperature_trends,
     plot_temperature_series_fits,
@@ -23,7 +23,7 @@ from visualisation import (
 
 
 def build_shared_triplets(
-    samples_dir: Union[str, Path],
+    samples_dir: Union[str, Path], 
     background_path: Union[str, Path],
     calibration_path: Union[str, Path],
     file_extension: str = ".asc",
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
     # Initial peak center estimates from absorption data (eV)
-    ABSORPTION_PEAKS = [1.75, 1.92, 2.02]
+    ABSORPTION_PEAKS = [1.75, 1.92, 1.98, 2.02]
 
     # Optional custom initial guesses for physical parameters
     CUSTOM_GUESSES = [
@@ -234,13 +234,19 @@ if __name__ == "__main__":
             "e_a": 0.045,       # Quenching activation energy (eV)
         },
         {
-            "gamma_0": 0.02,
+            "gamma_0": 0.01,
             "e_lo": 0.030,
             "gamma_lo": 0.025,
             "e_a": 0.035,
         },
         {
-            "gamma_0": 0.02,
+            "gamma_0": 0.01,
+            "e_lo": 0.030,
+            "gamma_lo": 0.025,
+            "e_a": 0.035,
+        },
+        {
+            "gamma_0": 0.01,
             "e_lo": 0.030,
             "gamma_lo": 0.025,
             "e_a": 0.035,
@@ -253,11 +259,11 @@ if __name__ == "__main__":
         calibration_path=CALIBRATION_FILE,
         absorption_peaks=ABSORPTION_PEAKS,
         custom_peak_guesses=CUSTOM_GUESSES,
-        calibration_mode="divide",
+        calibration_mode="multiply",
         test_additional_peak=True,
         output_dir="results",
-        n_walkers=60,
-        n_steps=3000,
-        burn_in=1000,
+        n_walkers=200,
+        n_steps=10000,
+        burn_in=3000,
         use_parallel=True,
     )
