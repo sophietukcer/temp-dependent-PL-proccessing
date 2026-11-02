@@ -99,3 +99,16 @@
 [2026-10-31 22:06:40] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 4 peaks RETAINED; extra peak not statistically justified.
 [2026-10-31 22:06:40] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
 [2026-10-31 22:08:39] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-02 15:39:04] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-02 15:41:30] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-02 15:42:58] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-02 15:44:04] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-02 15:44:04] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-02 15:44:04] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-02 16:03:35] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 5 peaks) ---
+[2026-11-02 16:25:11] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 5 peaks PREFERRED based on BIC drop (ΔBIC < -10).
+[2026-11-02 16:25:11] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-02 16:31:20] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-02 17:07:30] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-02 17:07:30] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-02 17:07:30] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
