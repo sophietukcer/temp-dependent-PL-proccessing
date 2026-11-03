@@ -196,7 +196,7 @@ def evaluate_composite_spectrum(
             f"Parameter array size mismatch: expected {expected_param_count} ({num_peaks} peaks * 9 params), got {len(flat_params)}."
         )
 
-    total_spectrum = np.zeros_like(energy_ev, dtype=np.float64)
+    total_spectrum = np.zeros_like(energy_ev, dtype=np.float32)
     for k in range(num_peaks):
         peak_params = flat_params[k * 9 : (k + 1) * 9]
         total_spectrum += evaluate_single_peak_at_temperature(

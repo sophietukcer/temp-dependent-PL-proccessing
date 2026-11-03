@@ -218,12 +218,12 @@ def run_full_analysis_pipeline(
 
 if __name__ == "__main__":
     # Update directory paths to your workspace layout
-    SAMPLES_DIR = r"E:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-14_ST072_15_BA_n=4\tests"        
+    SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-14_ST072_15_BA_n=4\tests"        
     BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_laser_on_0_4ns_480_766nm_50uW_294K_3rd_spot_3000gain_0.5s_100acc_2772t0_next_day.asc"   # Single shared background spectrum file
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
     # Initial peak center estimates from absorption data (eV)
-    ABSORPTION_PEAKS = [1.75, 1.92, 1.98, 2.02]
+    ABSORPTION_PEAKS = [1.75, 1.82, 1.95, 2.02]
 
     # Optional custom initial guesses for physical parameters
     CUSTOM_GUESSES = [
@@ -263,7 +263,7 @@ if __name__ == "__main__":
         test_additional_peak=True,
         output_dir="results",
         n_walkers=500,
-        n_steps=100000,
-        burn_in=20000,
+        n_steps=20000,
+        burn_in=6000,
         use_parallel=True,
     )

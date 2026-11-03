@@ -18,6 +18,96 @@ logger = logging.getLogger("pl_analysis.bayesian_sampler")
 
 KB_EV: float = 8.617333262145e-5  # Boltzmann constant in eV/K
 
+# def unpack_physical_parameters(params: np.ndarray, num_peaks: int) -> Tuple[List[np.ndarray], float]:
+#     """ Unpacks MCMC sampler vector (containing log-transformed scale parameters) into physical parameter vectors.
+#     """
+#     physical_peaks = []
+#     for k in range(num_peaks):
+#         p = params[k * 9 : (k + 1) * 9]
+#         phys_p = np.array([
+#             p[0],           # g0 (linear)
+#             np.exp(p[1]),   # gamma_ac = exp(ln_gamma_ac)
+#             p[2],           # g_lo (linear)
+#             p[3],           # e_lo (linear)
+#             p[4],           # i0 (linear)
+#             np.exp(p[5]),   # a_factor = exp(ln_a_factor)
+#             p[6],           # e_a (linear)
+#             p[7],           # e0 (linear)
+#             np.exp(p[8]),   # alpha = exp(ln_alpha)
+#         ], dtype=np.float64)
+#         physical_peaks.append(phys_p)
+
+#     log_sigma = params[-1]
+#     return physical_peaks, log_sigma
+
+# def get_physical_samples(flat_samples: np.ndarray, num_peaks: int) -> np.ndarray:
+#     """ Transforms thinned MCMC sample array columns from log-space back to physical space.
+#     """
+#     phys_samples = flat_samples.copy()
+#     for k in range(num_peaks):
+#         phys_samples[:, k * 9 + 1] = np.exp(flat_samples[:, k * 9 + 1])  # ln(gamma_ac) -> gamma_ac
+#         phys_samples[:, k * 9 + 5] = np.exp(flat_samples[:, k * 9 + 5])  # ln(a_factor) -> a_factor
+#         phys_samples[:, k * 9 + 8] = np.exp(flat_samples[:, k * 9 + 8])  # ln(alpha) -> alpha
+#     return phys_samples
+
+# def log_prior(
+#     params: np.ndarray,
+#     num_peaks: int,
+#     absorption_centers: List[float],
+#     temperatures: List[float],
+#     center_window_ev: float = 0.015,
+# ) -> float:
+#     if len(params) != 9 * num_peaks + 1:
+#         return -np.inf
+
+#     lp = 0.0
+
+#     # 1. Check 0 K peak energy ordering
+#     for k in range(num_peaks - 1):
+#         if params[k * 9 + 7] >= params[(k + 1) * 9 + 7]:
+#             return -np.inf
+
+#     # 2. Check bounds (linear and log-space limits)
+#     for k in range(num_peaks):
+#         g0, ln_g_ac, g_lo, e_lo, i0, ln_a_fac, e_a, e0, ln_alpha = params[k * 9 : (k + 1) * 9]
+
+#         # Uniform linear bounds
+#         if not (0.001 <= g0 <= 0.150): return -np.inf
+#         if not (0.001 <= g_lo <= 0.200): return -np.inf
+#         if not (0.005 <= e_lo <= 0.080): return -np.inf
+#         if not (1e-4 <= i0 <= 5.0): return -np.inf
+#         if not (0.001 <= e_a <= 0.500): return -np.inf
+
+#         # Uniform log-space bounds (np.log(min) <= ln_param <= np.log(max))
+#         if not (np.log(1e-6) <= ln_g_ac <= np.log(1e-2)): return -np.inf  # -13.82 to -4.61
+#         if not (np.log(1e-3) <= ln_a_fac <= np.log(1e4)): return -np.inf   # -6.91 to +9.21
+#         if not (np.log(1e-7) <= ln_alpha <= np.log(1e-3)): return -np.inf  # -16.12 to -6.91
+
+#         # Center target anchor
+#         target_center = absorption_centers[k]
+#         lp += -0.5 * ((e0 - target_center) / center_window_ev) ** 2
+
+#     log_sigma = params[-1]
+#     if not (-10.0 <= log_sigma <= 2.0):
+#         return -np.inf
+
+#     # 3. Evaluate single-temperature physics using unpacked physical parameters
+#     physical_peaks, _ = unpack_physical_parameters(params, num_peaks)
+    
+#     for t_val in temperatures:
+#         for k, phys_p in enumerate(physical_peaks):
+#             g0, g_ac, g_lo, e_lo, i0, a_fac, e_a, e0, alpha = phys_p
+
+#             # Center position at T
+#             e_t = e0 - alpha * t_val
+#             if not (1.70 <= e_t <= 2.30): return -np.inf
+
+#             # Linewidth at T
+#             exp_term = np.exp(e_lo / (KB_EV * t_val)) - 1.0
+#             gamma_t = g0 + g_ac * t_val + (g_lo / exp_term if exp_term > 0 else 0.0)
+#             if not (0.001 <= gamma_t <= 0.10): return -np.inf
+
+#     return lp
 
 def log_prior(
     params: np.ndarray,
@@ -25,8 +115,8 @@ def log_prior(
     absorption_centers: List[float],
     temperatures: List[float],
     center_window_ev: float = 0.015,
-    max_fwhm_ev: float = 0.150,
-    min_energy_ev: float = 1.50,
+    max_fwhm_ev: float = 0.10,
+    min_energy_ev: float = 1.70,
     max_energy_ev: float = 2.30,
 ) -> float:
     """ Calculates joint log-prior probability density enforcing both global parameter bounds and temperature-evaluated spectral bounds.
@@ -70,7 +160,7 @@ def log_prior(
             return -np.inf
         if not (0.001 <= e_a <= 0.500):
             return -np.inf
-        if not (1e-7 <= alpha <= 1e-3):
+        if not (1e-8 <= alpha <= 1e-1):
             return -np.inf
 
         target_center = absorption_centers[k]
@@ -80,7 +170,7 @@ def log_prior(
     if not (-10.0 <= log_sigma <= 2.0):
         return -np.inf
 
-    # 3. PER-TEMPERATURE BOUND EVALUATION across all experimental spectra
+    # bounds on gaussian peaks
     for t_val in temperatures:
         for k in range(num_peaks):
             g0, g_ac, g_lo, e_lo, i0, a_fac, e_a, e0, alpha = params[k * 9 : (k + 1) * 9]
@@ -88,6 +178,8 @@ def log_prior(
             # Evaluated peak center E_k(T)
             e_t = e0 - alpha * t_val
             if not (min_energy_ev <= e_t <= max_energy_ev):
+                return -np.inf
+            if not (absorption_centers[k] - 0.04 <= e_t <= absorption_centers[k] + 0.04):
                 return -np.inf
 
             # Evaluated linewidth Gamma_k(T) via Segall formula
@@ -100,7 +192,7 @@ def log_prior(
 
             # Evaluated intensity I_k(T) via Arrhenius quenching formula
             i_t = i0 / (1.0 + a_fac * np.exp(-e_a / (KB_EV * t_val)))
-            if not (1e-6 <= i_t <= 10.0):
+            if not (1e-6 <= i_t <= 2.0):
                 return -np.inf
 
         # Optional: Enforce peak energy ordering at higher temperatures (prevents high-T peak crossover)
@@ -144,6 +236,9 @@ def log_likelihood(
     flat_peak_params = params[:-1]
     log_sigma = params[-1]
     sigma2 = np.exp(2.0 * log_sigma)
+
+    # flat_peak_params, log_sigma = unpack_physical_parameters(params, num_peaks)
+    # sigma2 = np.exp(log_sigma)
 
     total_log_like = 0.0
 
@@ -293,11 +388,13 @@ def initialize_walker_positions(
             peak_dict.get("alpha_coeff", DEFAULT_PEAK_GUESSES["alpha_coeff"]),
         ])
 
+
+
     base_guess.append(log_sigma_guess)
-    initial_pos = np.array(base_guess, dtype=np.float64)
+    initial_pos = np.array(base_guess, dtype=np.float32)
 
     # 2. Populate walker array with prior validation
-    walker_positions = np.zeros((num_walkers, ndim), dtype=np.float64)
+    walker_positions = np.zeros((num_walkers, ndim), dtype=np.float32)
 
     for i in range(num_walkers):
         candidate_pos = initial_pos + jitter_std * np.random.randn(ndim) * np.abs(initial_pos)
@@ -392,8 +489,8 @@ def run_mcmc_sampling(
         )
         sampler.run_mcmc(init_positions, n_steps, progress=True)
 
-    flat_samples = sampler.get_chain(discard=burn_in, flat=True)
-    flat_log_prob = sampler.get_log_prob(discard=burn_in, flat=True)
+    flat_samples = sampler.get_chain(discard=burn_in, flat=True, thin = 20)
+    flat_log_prob = sampler.get_log_prob(discard=burn_in, flat=True, thin = 20)
 
     logger.info("MCMC sampling complete. Extracted %d post-burn-in sample vectors.", len(flat_samples))
     return sampler, flat_samples, flat_log_prob

@@ -81,7 +81,7 @@ def read_spectrum_file(file_path: Union[str, Path]) -> Tuple[np.ndarray, np.ndar
         skipped_headers,
     )
 
-    spectral_data = np.array(data_rows, dtype=np.float64)
+    spectral_data = np.array(data_rows, dtype=np.float32)
     return spectral_data[:, 0], spectral_data[:, 1]
 
 
