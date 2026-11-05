@@ -171,3 +171,50 @@
 [2026-11-03 17:41:13] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 4 peaks RETAINED; extra peak not statistically justified.
 [2026-11-03 17:41:13] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
 [2026-11-03 17:42:10] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-04 13:05:36] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 13:05:36] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 13:05:36] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-04 13:07:00] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Testing Extended Model (K = 5 peaks) ---
+[2026-11-04 13:08:11] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Model K = 5 peaks PREFERRED based on BIC drop (ΔBIC < -10).
+[2026-11-04 13:08:11] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-04 13:09:17] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-04 13:32:11] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 13:32:11] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 13:32:12] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 5 peaks) ---
+[2026-11-04 13:33:21] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 13:33:21] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 13:33:21] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 5 peaks) ---
+[2026-11-04 13:34:25] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-04 13:35:29] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-04 13:51:41] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 13:51:41] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 13:51:41] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 5 peaks) ---
+[2026-11-04 13:52:46] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-04 13:53:52] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-04 13:56:31] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 13:56:31] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 13:56:32] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-04 13:58:20] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-04 13:59:14] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-04 14:07:06] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 14:07:06] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 14:07:06] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-04 14:14:12] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-04 14:15:05] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-04 14:18:10] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-04 14:18:10] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-04 14:18:10] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-04 15:27:07] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-04 15:28:51] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-05 10:27:38] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-05 10:27:38] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-05 10:27:38] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-05 10:28:57] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Min acceptance:  0.245Mean Acceptance Fraction: 0.297
+[2026-11-05 10:28:57] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-05 10:29:52] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results
+[2026-11-05 10:31:50] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Initializing Photoluminescence Joint Bayesian MCMC Pipeline.
+[2026-11-05 10:31:50] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Paired 8 sample spectra with shared background and calibration files.
+[2026-11-05 10:31:50] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Fitting Base Model (K = 4 peaks) ---
+[2026-11-05 10:32:39] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Min acceptance:  0.207Mean Acceptance Fraction: 0.285
+[2026-11-05 10:32:39] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: --- Rendering Diagnostic Figures ---
+[2026-11-05 10:33:23] [INFO] [pl_analysis.main.run_full_analysis_pipeline]: Pipeline completed successfully. Figures saved to directory: results

@@ -127,7 +127,7 @@ def log_prior(
     num_peaks - int: Number of emission peaks fitted.
     absorption_centers - List[float]: Target absorption peak centers in eV.
     temperatures - List[float]: Array of experimental temperatures in Kelvin present in the dataset.
-    center_window_ev - float: Gaussian anchor standard deviation in eV for E0(0).
+    center_window_ev - float: FWHM in eV for E0(0).
     max_fwhm_ev - float: Maximum physical linewidth limit in eV at any individual temperature (default: 0.250 eV).
     min_energy_ev - float: Lower detector/grid energy bound in eV (default: 1.20 eV).
     max_energy_ev - float: Upper detector/grid energy bound in eV (default: 2.80 eV).
@@ -164,7 +164,8 @@ def log_prior(
             return -np.inf
 
         target_center = absorption_centers[k]
-        lp += -0.5 * ((e0 - target_center) / center_window_ev) ** 2
+        # 0.42466 factor converts s.d. to FWHM
+        lp += -0.5 * ((e0 - target_center) / (0.42466*center_window_ev)) ** 2
 
     log_sigma = params[-1]
     if not (-10.0 <= log_sigma <= 2.0):
@@ -179,7 +180,7 @@ def log_prior(
             e_t = e0 - alpha * t_val
             if not (min_energy_ev <= e_t <= max_energy_ev):
                 return -np.inf
-            if not (absorption_centers[k] - 0.04 <= e_t <= absorption_centers[k] + 0.04):
+            if not (absorption_centers[k] - 0.05 <= e_t <= absorption_centers[k] + 0.05):
                 return -np.inf
 
             # Evaluated linewidth Gamma_k(T) via Segall formula
@@ -192,7 +193,7 @@ def log_prior(
 
             # Evaluated intensity I_k(T) via Arrhenius quenching formula
             i_t = i0 / (1.0 + a_fac * np.exp(-e_a / (KB_EV * t_val)))
-            if not (1e-6 <= i_t <= 2.0):
+            if not (1e-3 <= i_t <= 1.0):
                 return -np.inf
 
         # Optional: Enforce peak energy ordering at higher temperatures (prevents high-T peak crossover)

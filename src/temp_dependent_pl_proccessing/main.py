@@ -9,6 +9,8 @@ performs BIC model selection, and saves diagnostic figures.
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
+from datetime import datetime
+import time
 
 from temp_dependent_pl_proccessing.bayesian_sampler import run_mcmc_sampling
 from temp_dependent_pl_proccessing.data_loader import process_temperature_series
@@ -109,15 +111,19 @@ def run_full_analysis_pipeline(
     FileNotFoundError: Raised if input directory or files do not exist.
     ValueError: Raised if processing or MCMC sampling parameters are invalid.
     """
-    out_path = Path(output_dir)
+    start_time = time.perf_counter()
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = Path(output_dir) / timestamp
     out_path.mkdir(parents=True, exist_ok=True)
 
     logger = setup_logger(
-        name="pl_analysis.main",
+        name="pl_analysis",
         log_level="INFO",
         log_file=out_path / "pipeline.log",
     )
     logger.info("Initializing Photoluminescence Joint Bayesian MCMC Pipeline.")
+    logger.info(f"Steps: {n_steps} \n Burn in: {burn_in} \n Walkers: {n_walkers}")
 
     # 1. Pairing and Ingesting Spectra
     file_triplets = build_shared_triplets(
@@ -154,6 +160,7 @@ def run_full_analysis_pipeline(
     )
 
     print(f"Min acceptance:  {np.min(sampler_k.acceptance_fraction):.3f}" + f"Mean Acceptance Fraction: {np.mean(sampler_k.acceptance_fraction):.3f}")
+    logger.info(f"Min acceptance:  {np.min(sampler_k.acceptance_fraction):.3f}" + f"Mean Acceptance Fraction: {np.mean(sampler_k.acceptance_fraction):.3f}")
 
     eval_k = evaluate_model_fit(flat_samples_k, flat_log_prob_k, processed_series, num_peaks=k_base)
     best_params = eval_k["mle_params"]
@@ -212,8 +219,14 @@ def run_full_analysis_pipeline(
         num_peaks=selected_k,
         save_path=out_path / "posterior_corner.png",
     )
+    end_time = time.perf_counter()
+    runtime_s = end_time - start_time
 
-    logger.info("Pipeline completed successfully. Figures saved to directory: %s", out_path)
+    minutes, seconds = divmod(runtime_s, 60)
+    hours, minutes = divmod(minutes, 60)
+    runtime = f"{hours:.0f}:{minutes:.0f}:{seconds:.0f}"
+    logger.info(f"Pipeline completed successfully. Runtime: {runtime}. Figures saved to directory: {out_path}")
+    
 
 
 if __name__ == "__main__":
@@ -223,7 +236,7 @@ if __name__ == "__main__":
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
     # Initial peak center estimates from absorption data (eV)
-    ABSORPTION_PEAKS = [1.75, 1.82, 1.95, 2.02]
+    ABSORPTION_PEAKS = [1.75, 1.80, 1.93, 2.02]
 
     # Optional custom initial guesses for physical parameters
     CUSTOM_GUESSES = [
@@ -251,6 +264,7 @@ if __name__ == "__main__":
             "gamma_lo": 0.025,
             "e_a": 0.035,
         },
+
     ]
 
     run_full_analysis_pipeline(
@@ -260,10 +274,10 @@ if __name__ == "__main__":
         absorption_peaks=ABSORPTION_PEAKS,
         custom_peak_guesses=CUSTOM_GUESSES,
         calibration_mode="multiply",
-        test_additional_peak=True,
+        test_additional_peak=False,
         output_dir="results",
-        n_walkers=500,
-        n_steps=20000,
-        burn_in=6000,
+        n_walkers=200,
+        n_steps=100,
+        burn_in=30,
         use_parallel=True,
     )

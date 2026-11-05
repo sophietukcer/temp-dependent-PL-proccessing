@@ -306,6 +306,8 @@ def plot_mcmc_traceplots(
         ax.plot(chain[:, :, i], "k-", alpha=0.15, lw=0.5)
         ax.set_ylabel(labels[i], fontsize=10)
         ax.grid(True, alpha=0.3)
+        ax.text(1,1, f"acceptance: {sampler.acceptance_fraction[i]}", ha="right", va="top", transform=ax.transAxes) 
+       
 
         if burn_in is not None:
             ax.axvline(x=burn_in, color="red", linestyle="--", lw=1.2, label="Burn-in Cutoff" if i == 0 else "")
