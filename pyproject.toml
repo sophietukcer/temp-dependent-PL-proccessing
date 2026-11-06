@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "arviz>=0.23.4",
     "corner>=2.3.0",
     "datetime>=6.0",
     "emcee>=3.1.6",
@@ -15,6 +16,7 @@ dependencies = [
     "matplotlib>=3.11.2",
     "numpy>=2.4.6",
     "pandas>=3.0.6",
+    "pymc>=5.28.5",
     "pytest>=9.2.0",
     "scipy>=1.17.1",
     "tqdm>=4.70.1",

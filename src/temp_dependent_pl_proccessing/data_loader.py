@@ -247,6 +247,57 @@ def process_single_dataset(
         "norm_factor": max_intensity,
     }
 
+def build_shared_triplets(
+    samples_dir: Union[str, Path], 
+    background_path: Union[str, Path],
+    calibration_path: Union[str, Path],
+    file_extension: str = ".asc",
+) -> List[Tuple[Path, Path, Path]]:
+    """ Discovers sample files in a directory, explicitly filtering out background and calibration files.
+    ------
+    OUTPUT - List[Tuple[Path, Path, Path]]: List of (sample_path, background_path, calibration_path) tuples.
+    ------
+    samples_dir - Union[str, Path]: Directory containing temperature-dependent sample files.
+    background_path - Union[str, Path]: Shared background file path.
+    calibration_path - Union[str, Path]: Shared calibration spectrum file path.
+    file_extension - str: Extension matching sample files (default: '.asc').
+    ------
+    FileNotFoundError: Raised if directory or shared background/calibration files do not exist.
+    """
+    samples_folder = Path(samples_dir)
+    bg_file = Path(background_path).resolve()
+    cal_file = Path(calibration_path).resolve()
+
+    if not samples_folder.is_dir():
+        raise FileNotFoundError(f"Samples directory not found: {samples_folder}")
+    if not bg_file.is_file():
+        raise FileNotFoundError(f"Shared background file not found: {bg_file}")
+    if not cal_file.is_file():
+        raise FileNotFoundError(f"Shared calibration file not found: {cal_file}")
+
+    all_matching_files = sorted(list(samples_folder.glob(f"*{file_extension}")))
+    sample_files: List[Path] = []
+
+    for f_path in all_matching_files:
+        f_resolved = f_path.resolve()
+        
+        # Skip if exact match to background or calibration file
+        if f_resolved == bg_file or f_resolved == cal_file:
+            continue
+
+        # Skip files with background/calibration keywords in the filename
+        fname_lower = f_path.name.lower()
+        if any(keyword in fname_lower for keyword in ["bg_", "_bg", "background", "cal_", "_cal", "calibration"]):
+            continue
+
+        sample_files.append(f_path)
+
+    if not sample_files:
+        raise FileNotFoundError(
+            f"No valid sample files found in '{samples_folder}' matching extension '{file_extension}' after filtering."
+        )
+
+    return [(s_file, bg_file, cal_file) for s_file in sample_files]
 
 def process_temperature_series(
     file_triplets: List[Tuple[Union[str, Path], Union[str, Path], Union[str, Path]]],
