@@ -68,7 +68,7 @@ def main(
         raise
 
     # 4. Export NetCDF Output
-    netcdf_path = output_dir / "pl_inference_data.nc"
+    netcdf_path = out_path / "pl_inference_data.nc"
     idata.to_netcdf(netcdf_path)
     logger.info(f"Saved InferenceData to disk: {netcdf_path.resolve()}")
 
@@ -109,27 +109,27 @@ def main(
     viz.plot_pymc_traces(
         idata=idata,
         var_names=target_params,
-        save_path=output_dir / "trace_plot.png",
+        save_path=out_path / "trace_plot.png",
     )
     
     # Corner / Pair Plot
     viz.plot_pymc_corner(
         idata=idata,
         var_names=target_params,
-        save_path=output_dir / "corner_plot.png",
+        save_path=out_path / "corner_plot.png",
     )
     
     # NUTS Energy Diagnostic
     viz.plot_energy_diagnostics(
         idata=idata,
-        save_path=output_dir / "energy_diagnostic.png",
+        save_path=out_path / "energy_diagnostic.png",
     )
 
     # Posterior Predictive Check (PPC Fit Overlay)
     if hasattr(idata, "posterior_predictive"):
         viz.plot_posterior_predictive_fit(
             idata=idata,
-            save_path=output_dir / "posterior_predictive_fit.png",
+            save_path=out_path / "posterior_predictive_fit.png",
         )
     else:
         logger.warning("No posterior predictive samples found in idata. Skipping PPC plot.")
@@ -138,10 +138,10 @@ def main(
     viz.plot_parameter_posteriors(
         idata=idata,
         var_names=["e0_0", "gamma_0", "gamma_ac", "alpha"],
-        save_path=output_dir / "posterior_hdi.png",
+        save_path=out_path / "posterior_hdi.png",
     )
 
-    logger.info(f"Pipeline finished. All figures and outputs saved to '{output_dir.resolve()}'.")
+    logger.info(f"Pipeline finished. All figures and outputs saved to '{out_path.resolve()}'.")
 
 
 if __name__ == "__main__":

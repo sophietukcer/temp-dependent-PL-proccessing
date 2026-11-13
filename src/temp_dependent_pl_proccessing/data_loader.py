@@ -3,6 +3,15 @@ data_loader.py
 --------------
 Module for loading, calibrating, Jacobian-transforming, and normalizing
 temperature-dependent photoluminescence (PL) data files.
+
+Normalisation
+-------------
+Spectra are normalised by ONE common factor (the maximum intensity found in
+any spectrum of the series), not by each spectrum's own maximum. This keeps the
+relative intensities between temperatures intact, which is what makes thermal
+quenching (Arrhenius) information recoverable. It only has physical meaning if
+all spectra were acquired under the same conditions (laser power, gain,
+exposure time, accumulations, alignment); otherwise correct for those first.
 """
 
 import logging
@@ -81,7 +90,9 @@ def read_spectrum_file(file_path: Union[str, Path]) -> Tuple[np.ndarray, np.ndar
         skipped_headers,
     )
 
-    spectral_data = np.array(data_rows, dtype=np.float32)
+    # float64 (was float32): avoids rounding of wavelengths/energies before the
+    # nm -> eV conversion.
+    spectral_data = np.array(data_rows, dtype=np.float64)
     return spectral_data[:, 0], spectral_data[:, 1]
 
 
@@ -164,9 +175,11 @@ def process_single_dataset(
     hc_const: float = 1239.842,
     calibration_mode: str = "multiply",
 ) -> Dict[str, Union[float, np.ndarray]]:
-    """ Processes raw sample, background, and calibration files into a background-subtracted, normalized energy spectrum.
+    """ Processes raw sample, background, and calibration files into a calibrated, background-subtracted energy spectrum.
+    The returned intensity is NOT normalised; normalisation is applied across the whole series
+    in `normalize_by_global_max` so that relative intensities between temperatures are preserved.
     ------
-    OUTPUT - Dict[str, Union[float, np.ndarray]]: Dict with keys 'temperature', 'energy_ev', 'intensity', and 'norm_factor'.
+    OUTPUT - Dict[str, Union[float, np.ndarray]]: Dict with keys 'temperature', 'energy_ev', and 'intensity' (unnormalised).
     ------
     sample_path - Union[str, Path]: File path to raw sample spectrum file.
     background_path - Union[str, Path]: File path to raw background spectrum file.
@@ -199,7 +212,6 @@ def process_single_dataset(
     bg_interp = interpolate_calibration(sample_wv, bg_wv, bg_int)
     cal_interp = interpolate_calibration(sample_wv, cal_wv, cal_int)
 
-
     if calibration_mode == "divide":
         zero_or_neg = cal_interp <= 0
         if np.any(zero_or_neg):
@@ -208,11 +220,8 @@ def process_single_dataset(
                 int(np.sum(zero_or_neg)),
             )
         cal_interp_safe = np.where(zero_or_neg, np.nan, cal_interp)
-        calibrated_sample = sample_int / cal_interp_safe
-        calibrated_sample = np.nan_to_num(calibrated_sample, nan=0.0)
-
-        calibrated_bg = bg_interp / cal_interp_safe
-        calibrated_bg = np.nan_to_num(calibrated_bg, nan=0.0)
+        calibrated_sample = np.nan_to_num(sample_int / cal_interp_safe, nan=0.0)
+        calibrated_bg = np.nan_to_num(bg_interp / cal_interp_safe, nan=0.0)
     elif calibration_mode == "multiply":
         calibrated_sample = sample_int * cal_interp
         calibrated_bg = bg_interp * cal_interp
@@ -220,35 +229,69 @@ def process_single_dataset(
         logger.error("Invalid calibration_mode specified: %s", calibration_mode)
         raise ValueError("calibration_mode must be either 'divide' or 'multiply'.")
 
-    energy_ev, sample_ev = convert_wavelength_to_energy(
-        sample_wv, calibrated_sample, hc_const=hc_const
+    # Background subtraction on the common sample wavelength grid, then a single
+    # Jacobian conversion. (Previously the background was converted with its own,
+    # uncropped wavelength array even though it had been interpolated onto the
+    # cropped sample grid, which is only correct if the two grids were identical.)
+    net_wavelength_domain = calibrated_sample - calibrated_bg
+    energy_ev, energy_int = convert_wavelength_to_energy(
+        sample_wv, net_wavelength_domain, hc_const=hc_const
     )
 
-    bg_ev = convert_wavelength_to_energy(
-        bg_wv, calibrated_bg, hc_const=hc_const
-    )[1]
-
-    energy_int = sample_ev - bg_ev
-
-    max_intensity = float(np.max(energy_int))
-    if max_intensity <= 0:
-        logger.error("Peak intensity for %s is non-positive (%.4e) post-processing.", sample_path, max_intensity)
-        raise ValueError(
-            f"Peak intensity for {sample_path} is non-positive after processing."
+    peak = float(np.max(energy_int))
+    if peak <= 0:
+        logger.warning(
+            "Peak intensity for %s is non-positive (%.4e) after background subtraction; check the background file.",
+            Path(sample_path).name,
+            peak,
         )
-
-    normalized_int = energy_int / max_intensity
-    logger.info("Dataset T = %.2f K processed successfully. Max intensity factor: %.4e", temperature, max_intensity)
+    logger.info("Dataset T = %.2f K processed. Raw peak intensity: %.4e", temperature, peak)
 
     return {
         "temperature": temperature,
         "energy_ev": energy_ev,
-        "intensity": normalized_int,
-        "norm_factor": max_intensity,
+        "intensity": energy_int,
     }
 
+
+def normalize_by_global_max(
+    processed_series: List[Dict[str, Union[float, np.ndarray]]],
+) -> List[Dict[str, Union[float, np.ndarray]]]:
+    """ Divides every spectrum in the series by the single largest intensity found in any spectrum.
+    Relative intensities between temperatures are preserved (the brightest spectrum peaks at 1,
+    all others peak at <= 1), so thermal quenching remains visible in the data.
+    ------
+    OUTPUT - List[Dict]: New list of dicts with normalised 'intensity' and 'norm_factor' (the common divisor, in raw units).
+    ------
+    processed_series - List[Dict]: Output of `process_single_dataset` for each temperature (unnormalised).
+    ------
+    ValueError: Raised if the series is empty or the global maximum is non-positive.
+    """
+    if not processed_series:
+        raise ValueError("Cannot normalise an empty spectral series.")
+
+    global_max = max(float(np.max(d["intensity"])) for d in processed_series)
+    if global_max <= 0:
+        logger.error("Global maximum intensity is non-positive (%.4e).", global_max)
+        raise ValueError("Global maximum intensity is non-positive; cannot normalise the series.")
+
+    normalized: List[Dict[str, Union[float, np.ndarray]]] = []
+    for d in processed_series:
+        new_d = dict(d)
+        new_d["intensity"] = np.asarray(d["intensity"], dtype=np.float64) / global_max
+        new_d["norm_factor"] = global_max
+        normalized.append(new_d)
+        logger.info(
+            "T = %.2f K: normalised peak = %.4f (global max = %.4e)",
+            float(d["temperature"]),
+            float(np.max(new_d["intensity"])),
+            global_max,
+        )
+    return normalized
+
+
 def build_shared_triplets(
-    samples_dir: Union[str, Path], 
+    samples_dir: Union[str, Path],
     background_path: Union[str, Path],
     calibration_path: Union[str, Path],
     file_extension: str = ".asc",
@@ -280,7 +323,7 @@ def build_shared_triplets(
 
     for f_path in all_matching_files:
         f_resolved = f_path.resolve()
-        
+
         # Skip if exact match to background or calibration file
         if f_resolved == bg_file or f_resolved == cal_file:
             continue
@@ -299,18 +342,23 @@ def build_shared_triplets(
 
     return [(s_file, bg_file, cal_file) for s_file in sample_files]
 
+
 def process_temperature_series(
     file_triplets: List[Tuple[Union[str, Path], Union[str, Path], Union[str, Path]]],
     hc_const: float = 1239.842,
     calibration_mode: str = "divide",
+    global_normalize: bool = True,
 ) -> List[Dict[str, Union[float, np.ndarray]]]:
     """ Batch-processes a series of temperature-dependent file triplets and returns them sorted by temperature.
     ------
     OUTPUT - List[Dict[str, Union[float, np.ndarray]]]: Sorted list of processed dataset dictionaries ordered by ascending temperature.
+        Each dict has 'temperature', 'energy_ev', 'intensity' (divided by the single global maximum
+        if global_normalize=True, otherwise raw calibrated units) and, when normalised, 'norm_factor'.
     ------
     file_triplets - List[Tuple[Union[str, Path], Union[str, Path], Union[str, Path]]]: List of (sample, background, calibration) path tuples.
     hc_const - float: Conversion constant in eV*nm (default: 1239.842).
     calibration_mode - str: Calibration mode, either 'divide' or 'multiply'.
+    global_normalize - bool: If True (default), divide all spectra by one common factor (the global maximum).
     ------
     ValueError: Raised if any file triplet processing fails.
     """
@@ -324,6 +372,10 @@ def process_temperature_series(
         processed_series.append(dataset)
 
     processed_series.sort(key=lambda d: float(d["temperature"]))
+
+    if global_normalize:
+        processed_series = normalize_by_global_max(processed_series)
+
     temperatures = [d["temperature"] for d in processed_series]
     logger.info("Batch processing complete. Processed temperatures (K): %s", temperatures)
     return processed_series

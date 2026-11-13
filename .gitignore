@@ -4,5 +4,12 @@ test-runs/
 
 results/
 
+results_pymc/
+
+__pycache__/
+
+*.py[cod]
+
+pytensor_cache/
 
 *.log

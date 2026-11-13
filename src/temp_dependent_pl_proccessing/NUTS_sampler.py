@@ -1,14 +1,3 @@
-import os
-msys_bin = r"C:\msys64\ucrt64\bin"
-if msys_bin not in os.environ["PATH"]:
-    os.environ["PATH"] = msys_bin + os.pathsep + os.environ["PATH"]
-
-# 2. Configure PyTensor flags (Compiler path + Clean cache location)
-os.environ["PYTENSOR_FLAGS"] = (
-    rf"cxx={msys_bin}\g++.exe,"
-    r"compiledir=C:\pytensor_cache"  # Avoids user directory spaces/permissions issues
-)
-
 
 from typing import Dict, List
 import numpy as np

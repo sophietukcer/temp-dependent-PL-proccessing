@@ -46,7 +46,6 @@ def plot_pymc_corner(
         var_names=var_names,
         kind="kde",
         marginals=True,
-        divergence=True,
         textsize=10,
         backend_kwargs={"layout": "constrained"},
     )
@@ -71,7 +70,7 @@ def plot_energy_diagnostics(
     """
     Plots NUTS energy transition vs. marginal energy distribution to assess sampling efficiency.
     """
-    ax = az.plot_energy(idata, fill_alpha=0.5, fill_color=["C0", "C1"])
+    ax = az.plot_energy(idata, fill_alpha=(0.5,0.5), fill_color=["C0", "C1"])
     fig = ax.get_figure()
     fig.suptitle("HMC Energy Diagnostic (Marginal Energy vs Energy Transition)")
     
@@ -90,16 +89,17 @@ def plot_posterior_predictive_fit(
     """
     Plots Posterior Predictive Checks (PPC) comparing theoretical spectral fits to raw data.
     """
-    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    fig, axes = plt.subplots(2, 4, figsize=(16, 8), sharex=True, sharey=True)
     az.plot_ppc(
         idata,
         data_pairs={"obs_T_*": "obs_T_*"},  # Matches per-temperature observed nodes
         num_pp_samples=num_pp_samples,
-        ax=ax,
+        ax=axes,
     )
-    ax.set_xlabel("Energy (eV)")
-    ax.set_ylabel("Intensity (a.u.)")
-    ax.set_title("Posterior Predictive Check: Measured PL vs Model Fit")
+    # axes[0].set_xlabel("Energy (eV)")
+    # axes[0].set_ylabel("Intensity (a.u.)")
+    # axes[0].set_title("Posterior Predictive Check: Measured PL vs Model Fit")
 
     if save_path:
         fig.savefig(Path(save_path), dpi=300, bbox_inches="tight")

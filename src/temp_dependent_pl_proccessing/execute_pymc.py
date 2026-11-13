@@ -1,13 +1,3 @@
-import os
-msys_bin = r"C:\msys64\ucrt64\bin"
-if msys_bin not in os.environ["PATH"]:
-    os.environ["PATH"] = msys_bin + os.pathsep + os.environ["PATH"]
-
-# 2. Configure PyTensor flags (Compiler path + Clean cache location)
-os.environ["PYTENSOR_FLAGS"] = (
-    rf"cxx={msys_bin}\g++.exe,"
-    r"compiledir=C:\pytensor_cache"  # Avoids user directory spaces/permissions issues
-)
 
 from temp_dependent_pl_proccessing.data_loader import process_temperature_series, build_shared_triplets
 from temp_dependent_pl_proccessing.logger_config import setup_logger
@@ -50,10 +40,10 @@ def run_pymc(samples_dir: Union[str, Path],
         for name, logp in model.point_logps().items():
             print(f"{name:25s}: {logp}")
         idata = pm.sample(
-        draws=100,
-        tune=100,
-        chains=2,
-        target_accept=0.90,
+        draws=1000,
+        tune=1000,
+        chains=4,
+        target_accept=0.95,
         random_seed=42,
         return_inferencedata=True,
         )
