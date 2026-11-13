@@ -209,13 +209,13 @@ def plot_temperature_trends(
         median = np.median(samples, axis=0)
         lo, hi = np.percentile(samples, [lo_q, hi_q], axis=0)
         for k in range(samples.shape[2]):
-            ax.plot(temps, median[:, k], "-o", ms=3, color=f"C{k}", label=f"Peak {k + 1}")
-            ax.fill_between(temps, lo[:, k], hi[:, k], color=f"C{k}", alpha=0.25)
+            ax.plot(temps, median[:, k], "-o", ms=3, color=colours[k], label=f"Peak {k + 1}")
+            ax.fill_between(temps, lo[:, k], hi[:, k], color=colours[k], alpha=0.25)
         ax.set_xlabel("Temperature (K)")
         ax.set_ylabel(label)
         if log_y:
             ax.set_yscale("log")
-    axes[0].legend(fontsize=8)
+    axes[0].legend(fontsize=8, frameon=False, loc="upper left")
     fig.tight_layout()
     return _finish(fig, save_path)
 

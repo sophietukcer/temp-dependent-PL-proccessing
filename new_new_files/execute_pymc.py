@@ -3,7 +3,7 @@ execute_pymc.py
 ---------------
 Loads and processes the spectra, builds the PyMC model, optionally runs a prior
 predictive check and a MAP fit, then samples with NUTS starting from the MAP
-(no random jitter by default).
+(random jitter by default).
 """
 
 import logging
