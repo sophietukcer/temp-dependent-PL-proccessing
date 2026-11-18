@@ -19,10 +19,10 @@ TARGET_PARAMS = [
     "e_ref", "de_dt", "e0_0",
     "gamma_0", "gamma_ac", "gamma_lo", "e_lo",
     "i_0", "e_a", "ln_q_ref", "eta",
-    "sigma", "rel_err", "baseline",
+    "sigma", "rel_err", "baseline", "bg_amp", "bg_decay",
 ]
 # Quantities that ARE identified even from a single spectrum (used for health checks of 1-temperature runs).
-DERIVED_PARAMS = ["e_centre", "fwhm", "area", "sigma", "rel_err", "baseline"]
+DERIVED_PARAMS = ["e_centre", "fwhm", "area", "sigma", "rel_err", "baseline", "bg_amp", "bg_decay"]
 # Parameters most prone to ridges/funnels; used for the divergence-highlighted pair plot.
 PAIR_PARAMS = ["gamma_0", "gamma_ac", "gamma_lo", "e_lo", "e_a", "ln_q_ref"]
 
@@ -235,14 +235,14 @@ if __name__ == "__main__":
     PRIORS = {
         "e_ref_sigma":        [8.0, 8.0, 8.0, 8.0],     # meV, ~3 sigma = +-10 nm
         "de_dt_sigma":        [0.08, 0.15, 0.08, 0.08],  # meV/K
-        "gamma_0_median":     [60.0, 130.0, 78.0, 68.0], # meV (FWHM near 0 K)
+        "gamma_0_median":     [45, 55, 68, 68.0], # meV (FWHM near 0 K)
         "gamma_0_sigma_log":  0.2,  
         "gamma_ac_median":    0.05,  "gamma_ac_sigma_log": 0.6,
         "gamma_lo_median":    [29, 44, 22, 10],  "gamma_lo_sigma_log": 0.6,
         "e_lo_median":        15.0,  "e_lo_sigma_log":     0.15,
         "i_0_median_log":     [4, 4, 4, 1],  # ln of areas 
         "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
-        "baseline_sigma":     0.003,
+        "baseline_sigma":     0.03,
     }
     # PRIORS = {
     #     "e_ref_sigma":       [40.0, 10.0, 10.0, 10.0],   # meV, tight on the two robust upper peaks
@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = [100]
+    TEMPERATURE_SUBSET = None
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,
@@ -271,5 +271,5 @@ if __name__ == "__main__":
          fit_baseline=True,
          relative_noise=True,
          lineshape=LINESHAPE,
-         trimmed_indices=(1.89, 2.60),
+         trimmed_indices=(1.85, 2.60),
          )

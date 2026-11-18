@@ -16,6 +16,7 @@ import numpy as np
 from temp_dependent_pl_proccessing.pl_physics import (
     OPTIONAL_PARAM_NAMES,
     PARAM_NAMES,
+    compute_e_min_mev,
     compute_t_ref,
     model_components,
 )
@@ -51,13 +52,25 @@ def _param_names_in(idata: az.InferenceData, group: str) -> List[str]:
 
 
 def _spectrum_model(
-    params: Mapping[str, Any], temperature: float, energy: np.ndarray, t_ref: float, idx: int
+    params: Mapping[str, Any],
+    temperature: float,
+    energy: np.ndarray,
+    t_ref: float,
+    idx: int,
+    e_min_mev: Optional[float] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """ model_components for spectrum number `idx`, picking that spectrum's baseline if the params have one. """
+    """ model_components for spectrum number `idx`, picking that spectrum's baseline/background if present. """
     p = dict(params)
     baseline = p.pop("baseline", None)
+    bg_amp = p.pop("bg_amp", None)
+    bg_decay = p.pop("bg_decay", None)
     b = 0.0 if baseline is None else float(np.asarray(baseline).reshape(-1)[idx])
-    return model_components(p, temperature, energy, t_ref, baseline=b)
+    amp = 0.0 if bg_amp is None else float(np.asarray(bg_amp).reshape(-1)[idx])
+    decay = None if bg_decay is None else float(np.asarray(bg_decay))
+    return model_components(
+        p, temperature, energy, t_ref,
+        baseline=b, bg_amp=amp, bg_decay=decay, e_min_mev=e_min_mev,
+    )
 
 
 def posterior_mean_params(idata: az.InferenceData, group: str = "posterior") -> Dict[str, np.ndarray]:
@@ -126,6 +139,7 @@ def plot_spectral_fits(
     if params is None and not draws:
         raise ValueError("Provide either `params` (point estimate) or `draws`.")
     t_ref = compute_t_ref(processed_series)
+    e_min_mev = compute_e_min_mev(processed_series)
     fig, axes = _spectrum_grid(len(processed_series), ncols, with_residuals=True)
 
     for idx, ((ax, ax_res), entry) in enumerate(zip(axes, processed_series)):
@@ -135,19 +149,25 @@ def plot_spectral_fits(
 
         ax.plot(energy, data, ".", ms=2, color="0.55", label="data", zorder=1)
 
-        draw_results = [_spectrum_model(d, temperature, energy, t_ref, idx) for d in draws] if draws else []
+        draw_results = [
+            _spectrum_model(d, temperature, energy, t_ref, idx, e_min_mev=e_min_mev) for d in draws
+        ] if draws else []
         for _, draw_total in draw_results:
             ax.plot(energy, draw_total, color="C0", alpha=0.08, lw=0.8, zorder=2)
 
         if params is not None:
-            comps, total = _spectrum_model(params, temperature, energy, t_ref, idx)
+            comps, total = _spectrum_model(params, temperature, energy, t_ref, idx, e_min_mev=e_min_mev)
+            bg = total - comps.sum(axis=1)
         else:
             comps = np.median(np.stack([c for c, _ in draw_results]), axis=0)
             total = np.median(np.stack([t for _, t in draw_results]), axis=0)
+            bg = np.median(np.stack([t - c.sum(axis=1) for c, t in draw_results]), axis=0)
 
         if show_components:
             for k in range(comps.shape[1]):
                 ax.fill_between(energy, comps[:, k], lw=1.0, color=colours[k], alpha=0.5, label=f"Peak {k + 1}", zorder=3)
+            if np.any(bg != 0.0):
+                ax.plot(energy, bg, "--", color="0.35", lw=1.0, label="background", zorder=3.5)
         ax.plot(energy, total, color="k", lw=1.4, label="total", zorder=4)
         ax.set_title(f"{temperature:g} K", fontsize=10)
 
@@ -170,6 +190,7 @@ def plot_prior_predictive(
     """ Prior predictive check: total model spectra from prior draws over the data.
     If these curves look nothing like spectra, fix the priors before sampling. """
     t_ref = compute_t_ref(processed_series)
+    e_min_mev = compute_e_min_mev(processed_series)
     prior_draws = sample_param_draws(idata, num_draws=num_draws, group="prior")
     fig, axes = _spectrum_grid(len(processed_series), ncols, with_residuals=False)
 
@@ -178,7 +199,7 @@ def plot_prior_predictive(
         energy = np.asarray(entry["energy_ev"], dtype=float)
         ax.plot(energy, np.asarray(entry["intensity"], dtype=float), ".", ms=2, color="0.55", zorder=1)
         for draw in prior_draws:
-            ax.plot(energy, _spectrum_model(draw, temperature, energy, t_ref, idx)[1],
+            ax.plot(energy, _spectrum_model(draw, temperature, energy, t_ref, idx, e_min_mev=e_min_mev)[1],
                     color="C0", alpha=0.25, lw=0.8, zorder=2)
         ax.set_title(f"{temperature:g} K", fontsize=10)
         ax.set_xlabel("Energy (eV)")

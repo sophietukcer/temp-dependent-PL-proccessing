@@ -33,16 +33,20 @@ DEFAULT_PRIORS: Dict[str, Any] = {
     "gamma_lo_sigma_log": 0.7,
     "e_lo_median": 30.0,        # meV, LO phonon energy (shared by all peaks)
     "e_lo_sigma_log": 0.3,
-    "i_0_median_log": 0.5,          
+    "i_0_median_log": 0.5,
     "i_0_sigma_log": 1.0,       # median is set from the lowest-T spectrum area
     "e_a_median": 40.0,         # meV, activation energy
     "e_a_sigma_log": 0.5,
     "ln_q_ref_sigma": 1.5,      # ln(quenched/radiative) at T_ref
     "noise_frac": 0.02,         # HalfNormal scale of the per-spectrum noise FLOOR, as a fraction of max intensity
     "noise_rel_sigma": 0.02,    # HalfNormal scale of rel_err (noise + model error as a fraction of the signal)
-    "baseline_sigma": 0.01,     # Normal(0, sigma) constant offset per spectrum (normalised units) ##TEST AS EXP
+    "baseline_mu": 0.035,       # Normal(mu, sigma) constant offset per spectrum (normalised units)
+    "baseline_sigma": 0.01,     # width of the prior on the constant offset
+    "bg_amp_sigma": 0.1,        # HalfNormal scale (fraction of y_max) for per-spectrum exp background amplitude
+    "bg_decay_median": 125.0,   # meV, shared exponential background decay length
+    "bg_decay_sigma_log": 0.2,  # log-normal width for shared exponential background decay length
     "eta_alpha": 2.0,           # Beta(alpha, beta) prior on the Lorentzian fraction eta (pseudo-Voigt only);
-    "eta_beta": 2.0,            # Beta(2, 2) = mild preference for a mixture, density -> 0 at eta = 0 and 1
+    "eta_beta": 3.0,            # Beta(2, 2) = mild preference for a mixture, density -> 0 at eta = 0 and 1
 }
 
 
@@ -65,7 +69,7 @@ def build_pl_pymc_model(
     absorption_centers - List[float]: initial peak centre estimates (eV), ascending; used as prior means.
     priors - Optional[Mapping[str, Any]]: overrides for DEFAULT_PRIORS (scalars, or one value per peak for
         per-peak parameters, e.g. {"gamma_0_median": [40, 60, 60, 40]}).
-    fit_baseline - bool: add a constant offset per spectrum (absorbs small background-subtraction errors).
+    fit_baseline - bool: add a constant offset + exponential background per spectrum.
     relative_noise - bool: heteroscedastic noise sd_i = sqrt(sigma^2 + (rel_err * y_i)^2) using the OBSERVED y_i
         (not the model), which avoids the amplitude bias of model-dependent noise. If False, one constant
         sigma per spectrum (the previous behaviour).
@@ -89,11 +93,12 @@ def build_pl_pymc_model(
             raise ValueError(f"Non-finite values in spectrum at T = {d['temperature']} K.")
     t_ref = compute_t_ref(processed_series)
 
-    # Data-driven SCALES for priors only (never the likelihood):
+    # Data-driven SCALES for priors and reference energy (never the likelihood):
     low = processed_series[int(np.argmin(temps))]
     area_low = float(_trapezoid(np.asarray(low["intensity"]), np.asarray(low["energy_ev"]) * 1e3))
     area_low = max(area_low, 1e-3)
     y_max = float(max(np.max(d["intensity"]) for d in processed_series))
+    e_min_mev = float(min(np.min(d["energy_ev"]) for d in processed_series)) * 1e3
 
     coords = {
         "peak": [f"Peak {i + 1}" for i in range(num_peaks)],
@@ -140,14 +145,15 @@ def build_pl_pymc_model(
         if relative_noise:
             rel_err = pm.HalfNormal("rel_err", sigma=pri["noise_rel_sigma"])
 
-        # ---- constant baseline offset per spectrum ------------------------------------------------
+        # ---- baseline: constant offset + exponential decay background ------------------------------
         if fit_baseline:
-            baseline = pm.Normal("baseline", mu=0.0, sigma=pri["baseline_sigma"], dims="spectrum")
-            # Positive amplitude for the background per spectrum
-            # baseline_amp = pm.HalfNormal("baseline_amp", sigma=y_max * pri["baseline_sigma"], dims="spectrum") #TEST
-            # Positive decay rate (per meV) or normalized decay scale
-            # baseline_rate = pm.HalfNormal("baseline_rate", sigma=0.005, dims="spectrum") #TEST
-        
+            baseline = pm.Normal(
+                "baseline", mu=pri["baseline_mu"], sigma=pri["baseline_sigma"], dims="spectrum"
+            )
+            bg_decay = pm.LogNormal(
+                "bg_decay", mu=np.log(pri["bg_decay_median"]), sigma=pri["bg_decay_sigma_log"]
+            )
+            bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max, dims="spectrum")
 
         params: Dict[str, Any] = {
             "e_ref": e_ref, "de_dt": de_dt, "gamma_0": gamma_0, "gamma_ac": gamma_ac,
@@ -158,7 +164,6 @@ def build_pl_pymc_model(
         centres_t, fwhm_t, area_t_all = [], [], []
         for idx, entry in enumerate(processed_series):
             t_val = temps[idx]
-            # e_raw = np.asarray(entry["energy_ev"], dtype=np.float64) ##TEST
             e_col = np.asarray(entry["energy_ev"], dtype=np.float64)[:, None] * 1e3  # (N, 1) in meV
             y_obs = np.asarray(entry["intensity"], dtype=np.float64)
 
@@ -167,15 +172,9 @@ def build_pl_pymc_model(
 
             spectrum_mu = pt.sum(profiles, axis=1)
             if fit_baseline:
-              # baseline is in log space to keep the total spectrum positive
-                spectrum_mu = spectrum_mu + baseline[idx]
-
-                # e_min = float(e_raw.min() * 1e3) ##TEST
-                # delta_e = e_col - e_min #TEST
-                
-                # Exponential decay background
-                # baseline_exp = baseline_amp[idx] * pt.exp(-baseline_rate[idx] * delta_e) #TEST
-                # spectrum_mu = spectrum_mu + baseline_exp[:, 0] #TEST
+                e_mev = e_col[:, 0]
+                bg_exp = bg_amp[idx] * pt.exp(-(e_mev - e_min_mev) / bg_decay)
+                spectrum_mu = spectrum_mu + baseline[idx] + bg_exp
 
             if relative_noise:
                 # y_obs is data (a constant), so sd_i is a fixed weight per point; 1e-12 keeps sqrt differentiable.
