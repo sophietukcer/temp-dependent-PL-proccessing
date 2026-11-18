@@ -8,7 +8,7 @@ predictive check and a MAP fit, then samples with NUTS starting from the MAP
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Sequence, Union
+from typing import Any, Dict, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pymc as pm
@@ -34,8 +34,8 @@ def run_pymc(
     absorption_peaks: List[float],
     calibration_mode: str = "multiply",
     temperature_subset: Optional[Sequence[float]] = None,
-    draws: int = 1000,
-    tune: int = 1500,
+    draws: int = 100,
+    tune: int = 150,
     chains: int = 4,
     target_accept: float = 0.95,
     random_seed: int = 51,
@@ -46,6 +46,7 @@ def run_pymc(
     fit_baseline: bool = True,
     relative_noise: bool = True,
     lineshape: str = "pseudo_voigt",
+    trimmed_indices: Tuple[float, float] = None,
 ) -> PLRunResult:
     """ Runs the full pipeline and returns a PLRunResult.
     ------
@@ -71,7 +72,7 @@ def run_pymc(
     )
     # All spectra are divided by ONE common factor so relative intensities (quenching) are preserved.
     processed_series = process_temperature_series(
-        file_triplets, calibration_mode=calibration_mode, global_normalize=True
+        file_triplets, calibration_mode=calibration_mode, global_normalize=True, trimmed_indices=trimmed_indices,
     )
 
     if temperature_subset is not None:

@@ -4,7 +4,7 @@ import logging.config
 import arviz as az
 import numpy as np
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from temp_dependent_pl_proccessing.execute_pymc import run_pymc
 import temp_dependent_pl_proccessing.visualisations_pymc as viz
@@ -63,6 +63,7 @@ def main(
         relative_noise: bool = True,
         lineshape: str = "pseudo_voigt",
         sampler_kwargs: Optional[Dict[str, Any]] = None,
+        trimmed_indices: Tuple[float, float] = None,
          ):
     """ Runs the full PL inference pipeline.
     ------
@@ -107,6 +108,7 @@ def main(
             relative_noise=relative_noise,
             lineshape=lineshape,
             **(sampler_kwargs or {}),
+            trimmed_indices=trimmed_indices,
         )
         logger.info("MCMC Sampling completed successfully. ")
     except Exception as e:
@@ -215,15 +217,15 @@ def main(
 
 
 if __name__ == "__main__":
-    SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-14_ST072_15_BA_n=4\tests"
-    BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_laser_on_0_4ns_480_766nm_50uW_294K_3rd_spot_3000gain_0.5s_100acc_2772t0_next_day.asc"   # Single shared background spectrum file
+    SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\first wavelengths\test"
+    BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_0_4ns_480_766nm_50uW_different_spot_3000gain_0.5s_100acc_2771t0_.asc"   # Single shared background spectrum file
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
     # Initial peak centres (eV), ascending; the number of peaks follows this list. Five components: the two
     # highest (1.934, 2.026) were stable across independent fits, the three lower ones are less well determined.
     # (The original absorption-based four-peak guess was [1.75, 1.80, 1.93, 2.02].)
     # ABSORPTION_PEAKS = [1.73, 1.84, 1.934, 2.026, 2.18]
-    ABSORPTION_PEAKS = [1.730, 1.775, 1.937, 2.022]
+    ABSORPTION_PEAKS = [1.93, 2.03, 2.2, 2.4]
     # ABSORPTION_PEAKS = [1.84, 1.90, 1.934, 2.026]
 
     # Prior overrides (None = DEFAULT_PRIORS in NUTS_sampler.py). Scalars apply to all peaks; per-peak
@@ -238,7 +240,7 @@ if __name__ == "__main__":
         "gamma_ac_median":    0.05,  "gamma_ac_sigma_log": 0.6,
         "gamma_lo_median":    [29, 44, 22, 10],  "gamma_lo_sigma_log": 0.6,
         "e_lo_median":        15.0,  "e_lo_sigma_log":     0.15,
-        "i_0_median_log":     [2.83, 4.91, 2.83, 1.67],  # ln of areas ~ [17, 135, 17, 23, 5.3]
+        "i_0_median_log":     [4, 4, 4, 1],  # ln of areas 
         "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
         "baseline_sigma":     0.003,
     }
@@ -258,7 +260,7 @@ if __name__ == "__main__":
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = None
+    TEMPERATURE_SUBSET = [100]
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,
@@ -269,4 +271,5 @@ if __name__ == "__main__":
          fit_baseline=True,
          relative_noise=True,
          lineshape=LINESHAPE,
+         trimmed_indices=(1.89, 2.60),
          )

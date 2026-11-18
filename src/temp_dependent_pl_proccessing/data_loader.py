@@ -173,6 +173,7 @@ def process_single_dataset(
     calibration_path: Union[str, Path],
     hc_const: float = 1239.842,
     calibration_mode: str = "multiply",
+    trimmed_indices: Tuple[float, float] = None,
 ) -> Dict[str, Union[float, np.ndarray]]:
     """ Processes raw sample, background, and calibration files into a calibrated, background-subtracted energy spectrum.
     The returned intensity is NOT normalised; normalisation is applied across the whole series
@@ -185,6 +186,7 @@ def process_single_dataset(
     calibration_path - Union[str, Path]: File path to system response calibration spectrum file.
     hc_const - float: Conversion constant in eV*nm (default: 1239.842).
     calibration_mode - str: Calibration mode, either 'divide' or 'multiply'.
+    trimmed_indices - Tuple[float, float]: Optional energy range (eV) to trim the output spectrum.
     ------
     ValueError: Raised if file reading, background subtraction, or calibration mode is invalid.
     """
@@ -235,6 +237,18 @@ def process_single_dataset(
         sample_wv, net_wavelength_domain, hc_const=hc_const
     )
 
+    if trimmed_indices:
+        assert trimmed_indices[0] < trimmed_indices[1], "trimmed_indices must be a (min, max) tuple."
+
+        energy_int = energy_int[(energy_ev >= trimmed_indices[0]) & (energy_ev <= trimmed_indices[1])]
+        energy_ev = energy_ev[(energy_ev >= trimmed_indices[0]) & (energy_ev <= trimmed_indices[1])]
+    
+        logger.info(
+            "Trimmed energy range to [%.2f, %.2f] eV",
+            trimmed_indices[0],
+            trimmed_indices[1]
+        )
+    
     peak = float(np.max(energy_int))
     if peak <= 0:
         logger.warning(
@@ -345,6 +359,7 @@ def process_temperature_series(
     hc_const: float = 1239.842,
     calibration_mode: str = "divide",
     global_normalize: bool = True,
+    trimmed_indices: Tuple[float, float] = None,
 ) -> List[Dict[str, Union[float, np.ndarray]]]:
     """ Batch-processes a series of temperature-dependent file triplets and returns them sorted by temperature.
     ------
@@ -364,7 +379,7 @@ def process_temperature_series(
 
     for sample_p, bg_p, cal_p in file_triplets:
         dataset = process_single_dataset(
-            sample_p, bg_p, cal_p, hc_const=hc_const, calibration_mode=calibration_mode
+            sample_p, bg_p, cal_p, hc_const=hc_const, calibration_mode=calibration_mode, trimmed_indices=trimmed_indices,
         )
         processed_series.append(dataset)
 
