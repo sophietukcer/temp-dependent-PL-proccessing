@@ -12,4 +12,6 @@ __pycache__/
 
 pytensor_cache/
 
+.pytest_cache/
+
 *.log
