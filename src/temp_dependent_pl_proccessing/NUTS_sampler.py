@@ -154,6 +154,8 @@ def build_pl_pymc_model(
                 "bg_decay", mu=np.log(pri["bg_decay_median"]), sigma=pri["bg_decay_sigma_log"]
             )
             bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max, dims="spectrum")
+            # bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max)
+
 
         params: Dict[str, Any] = {
             "e_ref": e_ref, "de_dt": de_dt, "gamma_0": gamma_0, "gamma_ac": gamma_ac,
@@ -174,6 +176,9 @@ def build_pl_pymc_model(
             if fit_baseline:
                 e_mev = e_col[:, 0]
                 bg_exp = bg_amp[idx] * pt.exp(-(e_mev - e_min_mev) / bg_decay)
+                # bg_exp = bg_amp * pt.exp(-(e_mev - e_min_mev) / bg_decay)
+
+
                 spectrum_mu = spectrum_mu + baseline[idx] + bg_exp
 
             if relative_noise:

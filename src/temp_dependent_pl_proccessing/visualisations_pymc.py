@@ -66,6 +66,8 @@ def _spectrum_model(
     bg_decay = p.pop("bg_decay", None)
     b = 0.0 if baseline is None else float(np.asarray(baseline).reshape(-1)[idx])
     amp = 0.0 if bg_amp is None else float(np.asarray(bg_amp).reshape(-1)[idx])
+    # amp = 0.0 if bg_amp is None else bg_amp
+
     decay = None if bg_decay is None else float(np.asarray(bg_decay))
     return model_components(
         p, temperature, energy, t_ref,

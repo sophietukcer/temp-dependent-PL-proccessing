@@ -237,12 +237,12 @@ if __name__ == "__main__":
         "de_dt_sigma":        [0.08, 0.15, 0.08, 0.08],  # meV/K
         "gamma_0_median":     [45, 55, 68, 68.0], # meV (FWHM near 0 K)
         "gamma_0_sigma_log":  0.2,  
-        "gamma_ac_median":    0.05,  "gamma_ac_sigma_log": 0.6,
-        "gamma_lo_median":    [29, 44, 22, 10],  "gamma_lo_sigma_log": 0.6,
-        "e_lo_median":        15.0,  "e_lo_sigma_log":     0.15,
+        "gamma_ac_median":    0.015,  "gamma_ac_sigma_log": 0.5,
+        "gamma_lo_median":    20,  "gamma_lo_sigma_log": 0.5,
+        "e_lo_median":        35.0,  "e_lo_sigma_log":     0.25,
         "i_0_median_log":     [4, 4, 4, 1],  # ln of areas 
         "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
-        "baseline_sigma":     0.03,
+        "baseline_sigma":     0.01,
     }
     # PRIORS = {
     #     "e_ref_sigma":       [40.0, 10.0, 10.0, 10.0],   # meV, tight on the two robust upper peaks
@@ -256,7 +256,8 @@ if __name__ == "__main__":
     #     "e_a_median":        80.0,                             # meV
     #     "e_a_sigma_log":     0.5,
     # }
-    LINESHAPE = "pseudo_voigt"   # or "gaussian"
+    LINESHAPE = "pseudo_voigt" 
+    # LINESHAPE = "gaussian"
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
@@ -271,5 +272,5 @@ if __name__ == "__main__":
          fit_baseline=True,
          relative_noise=True,
          lineshape=LINESHAPE,
-         trimmed_indices=(1.85, 2.60),
+         trimmed_indices=(1.86, 2.60),
          )
