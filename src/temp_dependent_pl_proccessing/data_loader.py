@@ -90,8 +90,7 @@ def read_spectrum_file(file_path: Union[str, Path]) -> Tuple[np.ndarray, np.ndar
         skipped_headers,
     )
 
-    # float64 (was float32): avoids rounding of wavelengths/energies before the
-    # nm -> eV conversion.
+    
     spectral_data = np.array(data_rows, dtype=np.float64)
     return spectral_data[:, 0], spectral_data[:, 1]
 
@@ -230,9 +229,7 @@ def process_single_dataset(
         raise ValueError("calibration_mode must be either 'divide' or 'multiply'.")
 
     # Background subtraction on the common sample wavelength grid, then a single
-    # Jacobian conversion. (Previously the background was converted with its own,
-    # uncropped wavelength array even though it had been interpolated onto the
-    # cropped sample grid, which is only correct if the two grids were identical.)
+    # Jacobian conversion. 
     net_wavelength_domain = calibrated_sample - calibrated_bg
     energy_ev, energy_int = convert_wavelength_to_energy(
         sample_wv, net_wavelength_domain, hc_const=hc_const
