@@ -172,7 +172,7 @@ def plot_spectral_fits(
                 ax.plot(energy, bg, "--", color="0.35", lw=1.0, label="background", zorder=3.5)
         ax.plot(energy, total, color="k", lw=1.4, label="total", zorder=4)
         ax.set_title(f"{temperature:g} K", fontsize=10)
-
+        # ax.set_xlim(-0.05, 1.05)
         ax_res.axhline(0.0, color="k", lw=0.6)
         ax_res.plot(energy, data - total, ".", ms=2, color="C3")
         ax_res.set_xlabel("Energy (eV)")

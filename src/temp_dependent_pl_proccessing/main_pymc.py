@@ -217,7 +217,7 @@ def main(
 
 
 if __name__ == "__main__":
-    SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\first wavelengths\test"
+    SAMPLES_DIR = r"E:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\first wavelengths\test"
     BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_0_4ns_480_766nm_50uW_different_spot_3000gain_0.5s_100acc_2771t0_.asc"   # Single shared background spectrum file
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         "gamma_0_median":     [45, 55, 68, 68.0], # meV (FWHM near 0 K)
         "gamma_0_sigma_log":  0.2,  
         "gamma_ac_median":    0.015,  "gamma_ac_sigma_log": 0.5,
-        "gamma_lo_median":    20,  "gamma_lo_sigma_log": 0.5,
+        "gamma_lo_median":    60,  "gamma_lo_sigma_log": 0.5,
         "e_lo_median":        35.0,  "e_lo_sigma_log":     0.25,
         "i_0_median_log":     [4, 4, 4, 1],  # ln of areas 
         "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = [100, 125, 150, 175, 200, 225]
+    TEMPERATURE_SUBSET = [125, 150, 175, 200, 225]
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,
