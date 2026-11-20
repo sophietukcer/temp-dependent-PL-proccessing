@@ -217,15 +217,15 @@ def main(
 
 
 if __name__ == "__main__":
-    SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\first wavelengths\test"
-    BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_0_4ns_480_766nm_50uW_different_spot_3000gain_0.5s_100acc_2771t0_.asc"   # Single shared background spectrum file
+    SAMPLES_DIR = r"E:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\second wavelengths\code_test"
+    BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_4_8ns_564_850nm_50uW_different_spot_3000gain_0.5s_30acc_2771t0_.asc"   # Single shared background spectrum file
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
     # Initial peak centres (eV), ascending; the number of peaks follows this list. Five components: the two
     # highest (1.934, 2.026) were stable across independent fits, the three lower ones are less well determined.
     # (The original absorption-based four-peak guess was [1.75, 1.80, 1.93, 2.02].)
     # ABSORPTION_PEAKS = [1.73, 1.84, 1.934, 2.026, 2.18]
-    ABSORPTION_PEAKS = [1.93, 2.03, 2.2, 2.4]
+    ABSORPTION_PEAKS = [1.62]
     # ABSORPTION_PEAKS = [1.84, 1.90, 1.934, 2.026]
 
     # Prior overrides (None = DEFAULT_PRIORS in NUTS_sampler.py). Scalars apply to all peaks; per-peak
@@ -233,16 +233,18 @@ if __name__ == "__main__":
     # Starting values derived from least-squares fits of this data set: component widths of ~65-100 meV,
     # a thermal broadening that is NOT negligible, and an activation energy near 80 meV for the total intensity.
     PRIORS = {
-        "e_ref_sigma":        [8.0, 8.0, 8.0, 8.0],     # meV, ~3 sigma = +-10 nm
-        "de_dt_sigma":        [0.08, 0.15, 0.08, 0.08],  # meV/K
-        "gamma_0_median":     [45, 55, 68, 68.0], # meV (FWHM near 0 K)
-        "gamma_0_sigma_log":  0.2,  
-        "gamma_ac_median":    0.015,  "gamma_ac_sigma_log": 0.5,
-        "gamma_lo_median":    20,  "gamma_lo_sigma_log": 0.5,
-        "e_lo_median":        35.0,  "e_lo_sigma_log":     0.25,
-        "i_0_median_log":     [4, 4, 4, 1],  # ln of areas 
-        "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
-        "baseline_sigma":     0.01,
+        "e_ref_sigma":        [4.0],            # meV
+        "de_dt_sigma":        [0.15],           # not identifiable from one temperature
+        "gamma_0_median":     [82.0],  "gamma_0_sigma_log": 0.1,
+        "gamma_ac_median":    0.015,   "gamma_ac_sigma_log": 0.5,   # unchanged: ~1 meV at 75 K
+        "gamma_lo_median":    20.0,    "gamma_lo_sigma_log": 0.5,   # unchanged: ~0.1 meV at 75 K
+        "e_lo_median":        35.0,    "e_lo_sigma_log":     0.25,
+        "i_0_median_log":     [4.52],           # ln(2 x 46)
+        "i_0_sigma_log":      [0.1],
+        "ln_q_ref_sigma":     0.1,              # see note below
+        "baseline_sigma":     0.003,
+        "noise_frac":         0.002,
+        "eta_alpha": 2.0,  "eta_beta": 4.0,     # Lorentzian fraction favouring ~0.3
     }
     # PRIORS = {
     #     "e_ref_sigma":       [40.0, 10.0, 10.0, 10.0],   # meV, tight on the two robust upper peaks
@@ -261,7 +263,7 @@ if __name__ == "__main__":
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = [100, 125, 150, 175, 200, 225]
+    TEMPERATURE_SUBSET = [75]
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,
@@ -272,5 +274,5 @@ if __name__ == "__main__":
          fit_baseline=True,
          relative_noise=True,
          lineshape=LINESHAPE,
-         trimmed_indices=(1.86, 2.60),
+         trimmed_indices=None,
          )

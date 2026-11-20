@@ -42,9 +42,6 @@ DEFAULT_PRIORS: Dict[str, Any] = {
     "noise_rel_sigma": 0.02,    # HalfNormal scale of rel_err (noise + model error as a fraction of the signal)
     "baseline_mu": 0.035,       # Normal(mu, sigma) constant offset per spectrum (normalised units)
     "baseline_sigma": 0.01,     # width of the prior on the constant offset
-    "bg_amp_sigma": 0.1,        # HalfNormal scale (fraction of y_max) for per-spectrum exp background amplitude
-    "bg_decay_median": 125.0,   # meV, shared exponential background decay length
-    "bg_decay_sigma_log": 0.2,  # log-normal width for shared exponential background decay length
     "eta_alpha": 2.0,           # Beta(alpha, beta) prior on the Lorentzian fraction eta (pseudo-Voigt only);
     "eta_beta": 3.0,            # Beta(2, 2) = mild preference for a mixture, density -> 0 at eta = 0 and 1
 }
@@ -56,7 +53,7 @@ def build_pl_pymc_model(
     absorption_centers: List[float],
     priors: Optional[Mapping[str, Any]] = None,
     fit_baseline: bool = True,
-    relative_noise: bool = True,
+    relative_noise: bool = False,
     lineshape: str = "pseudo_voigt",
 ) -> pm.Model:
     """ Builds a PyMC Bayesian model for temperature-dependent PL fitting.
@@ -150,11 +147,7 @@ def build_pl_pymc_model(
             baseline = pm.Normal(
                 "baseline", mu=pri["baseline_mu"], sigma=pri["baseline_sigma"], dims="spectrum"
             )
-            bg_decay = pm.LogNormal(
-                "bg_decay", mu=np.log(pri["bg_decay_median"]), sigma=pri["bg_decay_sigma_log"]
-            )
-            bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max, dims="spectrum")
-            # bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max)
+
 
 
         params: Dict[str, Any] = {
@@ -175,11 +168,8 @@ def build_pl_pymc_model(
             spectrum_mu = pt.sum(profiles, axis=1)
             if fit_baseline:
                 e_mev = e_col[:, 0]
-                bg_exp = bg_amp[idx] * pt.exp(-(e_mev - e_min_mev) / bg_decay)
-                # bg_exp = bg_amp * pt.exp(-(e_mev - e_min_mev) / bg_decay)
-
-
-                spectrum_mu = spectrum_mu + baseline[idx] + bg_exp
+        
+                spectrum_mu = spectrum_mu + baseline
 
             if relative_noise:
                 # y_obs is data (a constant), so sd_i is a fixed weight per point; 1e-12 keeps sqrt differentiable.
