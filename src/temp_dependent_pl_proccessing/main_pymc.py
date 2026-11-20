@@ -235,10 +235,10 @@ if __name__ == "__main__":
     PRIORS = {
         "e_ref_sigma":        [4.0],            # meV
         "de_dt_sigma":        [0.15],           # not identifiable from one temperature
-        "gamma_0_median":     [82.0],  "gamma_0_sigma_log": 0.1,
-        "gamma_ac_median":    0.015,   "gamma_ac_sigma_log": 0.5,   # unchanged: ~1 meV at 75 K
-        "gamma_lo_median":    20.0,    "gamma_lo_sigma_log": 0.5,   # unchanged: ~0.1 meV at 75 K
-        "e_lo_median":        35.0,    "e_lo_sigma_log":     0.25,
+        "gamma_0_median":     [82.0],  "gamma_0_sigma_log": 1.0,
+        "gamma_ac_median":    0.015,   "gamma_ac_sigma_log": 1.0,   # unchanged: ~1 meV at 75 K
+        "gamma_lo_median":    20.0,    "gamma_lo_sigma_log": 1.0,   # unchanged: ~0.1 meV at 75 K
+        "e_lo_median":        35.0,    "e_lo_sigma_log":     1.0,
         "i_0_median_log":     [4.52],           # ln(2 x 46)
         "i_0_sigma_log":      [0.1],
         "ln_q_ref_sigma":     0.1,              # see note below
@@ -263,7 +263,7 @@ if __name__ == "__main__":
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = [75]
+    TEMPERATURE_SUBSET = None
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,

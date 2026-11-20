@@ -40,7 +40,7 @@ DEFAULT_PRIORS: Dict[str, Any] = {
     "ln_q_ref_sigma": 1.5,      # ln(quenched/radiative) at T_ref
     "noise_frac": 0.02,         # HalfNormal scale of the per-spectrum noise FLOOR, as a fraction of max intensity
     "noise_rel_sigma": 0.02,    # HalfNormal scale of rel_err (noise + model error as a fraction of the signal)
-    "baseline_mu": 0.035,       # Normal(mu, sigma) constant offset per spectrum (normalised units)
+    "baseline_mu": 0.005,       # Normal(mu, sigma) constant offset per spectrum (normalised units)
     "baseline_sigma": 0.01,     # width of the prior on the constant offset
     "eta_alpha": 2.0,           # Beta(alpha, beta) prior on the Lorentzian fraction eta (pseudo-Voigt only);
     "eta_beta": 3.0,            # Beta(2, 2) = mild preference for a mixture, density -> 0 at eta = 0 and 1
@@ -169,7 +169,7 @@ def build_pl_pymc_model(
             if fit_baseline:
                 e_mev = e_col[:, 0]
         
-                spectrum_mu = spectrum_mu + baseline
+                spectrum_mu = spectrum_mu + baseline[idx]
 
             if relative_noise:
                 # y_obs is data (a constant), so sd_i is a fixed weight per point; 1e-12 keeps sqrt differentiable.
