@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = None
+    TEMPERATURE_SUBSET = [100, 125, 150, 175, 200, 225]
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,
