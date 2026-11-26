@@ -10,17 +10,16 @@ normalised units produced by data_loader (areas are therefore in
 normalised-intensity * meV).
 
 Model (per peak k, at temperature T)
-    centre  : E(T)   = e_ref + de_dt * (T - T_ref)                 [linear / high-T Varshni limit]
+    centre  : E(T)   = e_ref + a_te * (T - T_ref)
+                       + a_ep * [2 / (exp(e_lo / kT) - 1) - 2 / (exp(e_lo / kT_ref) - 1)]
     FWHM    : G(T)   = gamma_0 + gamma_ac * T + gamma_lo / (exp(e_lo / kT) - 1)
-    area    : A(T)   = i_0 / (1 + exp(ln_q_ref - e_a * (1/kT - 1/kT_ref)))
-              (Arrhenius quenching, parametrised by the quenched/radiative
-               ratio q_ref at T_ref to decorrelate the prefactor from e_a)
+    area    : A(T)   = free per (spectrum, peak) parameter `area`
     profile : Gaussian (default) or pseudo-Voigt with the given centre, FWHM and *area*.
               Pseudo-Voigt = (1 - eta) * Gaussian + eta * Lorentzian, both with the SAME FWHM and unit area,
               so `eta` (per peak, 0 = Gaussian, 1 = Lorentzian) only changes the tails, not the width or area.
 """
 
-from typing import Any, Callable, Dict, List, Mapping, Sequence, Tuple
+from typing import Any, Callable, Dict, Mapping, Sequence, Tuple
 
 import numpy as np
 
@@ -31,15 +30,14 @@ AREA_PER_HEIGHT_FWHM: float = float(np.sqrt(np.pi / (4.0 * np.log(2.0))))
 
 # Names of the free physical parameters, shared by the model, runner and plots.
 PARAM_NAMES: Tuple[str, ...] = (
-    "e_ref",     # peak centre at T_ref (meV)           [per peak]
-    "de_dt",     # centre shift, meV/K (blueshift > 0)   [per peak]
-    "gamma_0",   # inhomogeneous FWHM (meV)              [per peak]
-    "gamma_ac",  # acoustic phonon coupling (meV/K)      [per peak]
-    "gamma_lo",  # optical phonon coupling (meV)         [per peak]
-    "e_lo",      # LO phonon energy (meV)                [shared scalar]
-    "i_0",       # unquenched (T -> 0) area              [per peak]
-    "e_a",       # activation energy (meV)               [per peak]
-    "ln_q_ref",  # ln(quenched/radiative) at T_ref       [per peak]
+    "e_ref",     # peak centre at T_ref (meV)                   [per peak]
+    "a_te",      # thermal expansion shift coeff (meV/K, > 0)   [per peak]
+    "a_ep",      # electron-phonon coupling weight (meV, < 0)   [per peak]
+    "gamma_0",   # inhomogeneous FWHM (meV)                     [per peak]
+    "gamma_ac",  # acoustic phonon coupling (meV/K)             [per peak]
+    "gamma_lo",  # optical phonon coupling (meV)                [per peak]
+    "e_lo",      # LO phonon energy (meV)                       [shared scalar]
+    "area",      # free integrated peak area                    [per spectrum, per peak]
 )
 
 # Optional parameters, present only when the model was built with them:
@@ -50,7 +48,7 @@ OPTIONAL_PARAM_NAMES: Tuple[str, ...] = ("baseline", "eta")
 
 
 def compute_t_ref(processed_series: Sequence[Mapping[str, Any]]) -> float:
-    """ Reference temperature (K) used to decorrelate centre/area parameters: mean of the fitted temperatures. """
+    """ Reference temperature (K) used to decorrelate centre parameters: mean of the fitted temperatures. """
     return float(np.mean([float(d["temperature"]) for d in processed_series]))
 
 
@@ -58,20 +56,25 @@ def peak_physics(
     temperature: float,
     t_ref: float,
     p: Mapping[str, Any],
-    exp: Callable,
     expm1: Callable,
-) -> Tuple[Any, Any, Any]:
-    """ Centre (meV), FWHM (meV) and area at one temperature.
-    `exp`/`expm1` select the backend: (pt.exp, pt.expm1) for PyMC or (np.exp, np.expm1) for numpy.
+) -> Tuple[Any, Any]:
+    """ Centre (meV) and FWHM (meV) at one temperature.
+    `expm1` selects the backend: `pt.expm1` for PyMC or `np.expm1` for numpy.
     expm1 keeps the Bose factor accurate and differentiable for small e_lo/kT.
     """
     kt = KB_MEV * temperature
     kt_ref = KB_MEV * t_ref
-    e_t = p["e_ref"] + p["de_dt"] * (temperature - t_ref)
-    gamma_t = p["gamma_0"] + p["gamma_ac"] * temperature + p["gamma_lo"] / expm1(p["e_lo"] / kt)
-    quench = exp(p["ln_q_ref"] - p["e_a"] * (1.0 / kt - 1.0 / kt_ref))
-    area_t = p["i_0"] / (1.0 + quench)
-    return e_t, gamma_t, area_t
+
+    bose_t = 1.0 / expm1(p["e_lo"] / kt)
+    bose_ref = 1.0 / expm1(p["e_lo"] / kt_ref)
+
+    e_t = (
+        p["e_ref"]
+        + p["a_te"] * (temperature - t_ref)
+        + p["a_ep"] * 2.0 * (bose_t - bose_ref)
+    )
+    gamma_t = p["gamma_0"] + p["gamma_ac"] * temperature + p["gamma_lo"] * bose_t
+    return e_t, gamma_t
 
 
 def gaussian_profiles(
@@ -123,6 +126,7 @@ def model_components(
     temperature: float,
     energy_ev: np.ndarray,
     t_ref: float,
+    area_t: np.ndarray,
     baseline: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """ Numerical model spectrum for one parameter set (e.g. MAP, posterior mean or a single draw).
@@ -130,16 +134,20 @@ def model_components(
     OUTPUT - (components, total): components has shape (N_energy, n_peaks); total has shape (N_energy,)
         and includes the constant `baseline` offset (the components do not).
     ------
-    params - mapping with the keys of PARAM_NAMES (values are numpy arrays / scalars, per-peak where applicable).
+    params - mapping with the keys of PARAM_NAMES (excluding 'area', which is passed via `area_t`).
         An 'eta' entry (per-peak Lorentzian fraction) selects the pseudo-Voigt lineshape; without it the peaks are
-        Gaussian. Any 'baseline' entry is ignored here; pass the value for THIS spectrum via `baseline`.
+        Gaussian. Any 'baseline' or 'area' entries in `params` are ignored here; pass the values for THIS
+        spectrum via `area_t` and `baseline`.
     energy_ev - energy grid in eV (converted to meV internally).
+    area_t - 1D array of peak areas (shape (n_peaks,)) for THIS spectrum.
     baseline - constant offset for this spectrum, in normalised-intensity units.
     """
+    excluded = {"baseline", "area"}
     p: Dict[str, np.ndarray] = {
-        k: np.asarray(v, dtype=np.float64) for k, v in params.items() if k != "baseline"
+        k: np.asarray(v, dtype=np.float64) for k, v in params.items() if k not in excluded
     }
     e_col = np.asarray(energy_ev, dtype=np.float64)[:, None] * 1e3
-    e_t, gamma_t, area_t = peak_physics(float(temperature), t_ref, p, np.exp, np.expm1)
-    comps = peak_profiles(e_col, e_t, gamma_t, area_t, np.exp, eta=p.get("eta"))
+    e_t, gamma_t = peak_physics(float(temperature), t_ref, p, np.expm1)
+    area_arr = np.asarray(area_t, dtype=np.float64)
+    comps = peak_profiles(e_col, e_t, gamma_t, area_arr, np.exp, eta=p.get("eta"))
     return comps, comps.sum(axis=1) + float(baseline)

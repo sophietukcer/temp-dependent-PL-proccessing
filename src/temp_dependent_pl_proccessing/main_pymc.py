@@ -10,21 +10,19 @@ from temp_dependent_pl_proccessing.execute_pymc import run_pymc
 import temp_dependent_pl_proccessing.visualisations_pymc as viz
 
 import inspect
-from temp_dependent_pl_proccessing.NUTS_sampler import DEFAULT_PRIORS   
-
+from temp_dependent_pl_proccessing.NUTS_sampler import DEFAULT_PRIORS
 
 
 # Physical parameters reported in the convergence summary and plots.
 TARGET_PARAMS = [
-    "e_ref", "de_dt", "e0_0",
+    "e_ref", "a_te", "a_ep", "e0_0",
     "gamma_0", "gamma_ac", "gamma_lo", "e_lo",
-    "i_0", "e_a", "ln_q_ref", "eta",
-    "sigma", "rel_err", "baseline",
+    "eta", "sigma", "rel_err", "baseline",
 ]
 # Quantities that ARE identified even from a single spectrum (used for health checks of 1-temperature runs).
 DERIVED_PARAMS = ["e_centre", "fwhm", "area", "sigma", "rel_err", "baseline"]
 # Parameters most prone to ridges/funnels; used for the divergence-highlighted pair plot.
-PAIR_PARAMS = ["gamma_0", "gamma_ac", "gamma_lo", "e_lo", "e_a", "ln_q_ref"]
+PAIR_PARAMS = ["a_te", "a_ep", "gamma_0", "gamma_ac", "gamma_lo", "e_lo"]
 
 
 def setup_logger(config_path: Union[str, Path] = "logger_config.py", log_level="INFO", log_file=None) -> logging.Logger:
@@ -43,7 +41,7 @@ def setup_logger(config_path: Union[str, Path] = "logger_config.py", log_level="
         logging.warning(f"Logger config file '{config_path}' not found. Using default basicConfig.")
     logger = logging.getLogger("pl_pymc_pipeline")
     logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
-    if log_file is not None:                    
+    if log_file is not None:
         fh = logging.FileHandler(log_file, encoding="utf-8")
         fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
         logger.addHandler(fh)
@@ -73,9 +71,6 @@ def main(
     lineshape - "pseudo_voigt" (per-peak Lorentzian fraction eta, default) or "gaussian".
     sampler_kwargs - forwarded to run_pymc (draws, tune, chains, target_accept, use_map_init, init_jitter, ...).
     """
-    # Initialize Logger
-
-
     # Paths & Physical Settings
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = Path(output_dir) / timestamp
@@ -87,12 +82,12 @@ def main(
     # Execute PyMC Sampling
     logger.info("Executing NUTS MCMC Sampling via run_pymc()...")
     logger.info(
-    "Run config | peaks=%s | lineshape=%s | subset=%s | baseline=%s | rel_noise=%s | priors=%s | sampler=%s",
-    absorption_peaks, lineshape, temperature_subset, fit_baseline, relative_noise,
-    {**DEFAULT_PRIORS, **(priors or {})},
-    {**{k: v.default for k, v in inspect.signature(run_pymc).parameters.items()
-        if k in ("draws", "tune", "chains", "target_accept", "random_seed", "use_map_init", "init_jitter")},
-     **(sampler_kwargs or {})},
+        "Run config | peaks=%s | lineshape=%s | subset=%s | baseline=%s | rel_noise=%s | priors=%s | sampler=%s",
+        absorption_peaks, lineshape, temperature_subset, fit_baseline, relative_noise,
+        {**DEFAULT_PRIORS, **(priors or {})},
+        {**{k: v.default for k, v in inspect.signature(run_pymc).parameters.items()
+            if k in ("draws", "tune", "chains", "target_accept", "random_seed", "use_map_init", "init_jitter")},
+         **(sampler_kwargs or {})},
     )
     try:
         result = run_pymc(
@@ -135,7 +130,7 @@ def main(
     if num_divergent > 0:
         logger.warning(
             f"Detected {num_divergent} divergent transitions! Inspect pair_plot.png (divergences highlighted), "
-            "especially gamma_ac vs gamma_lo vs e_lo and e_a vs ln_q_ref, and compare the prior predictive "
+            "especially a_te vs a_ep and gamma_ac vs gamma_lo vs e_lo, and compare the prior predictive "
             "and MAP fit plots before simply raising target_accept."
         )
     else:
@@ -145,7 +140,7 @@ def main(
     summary = az.summary(idata, var_names=target_params + [p for p in DERIVED_PARAMS[:3] if p in idata.posterior])
 
     if len(series) == 1:
-        # One spectrum cannot identify de_dt, gamma_ac, gamma_lo, e_lo, e_a, or i_0 vs ln_q_ref separately
+        # One spectrum cannot identify a_te, a_ep, gamma_ac, gamma_lo, or e_lo separately
         # (they stay prior-driven / degenerate), so judge convergence on the quantities the data DO constrain.
         logger.info("Single-temperature run: convergence is judged on e_centre, fwhm, area, noise terms and baseline only.")
         check = summary.loc[[i for i in summary.index if i.split("[")[0] in DERIVED_PARAMS]]
@@ -185,7 +180,7 @@ def main(
         save_path=out_path / "posterior_fit.png",
     )
 
-    # Physical trends vs temperature (centre, FWHM, area)
+    # Physical trends vs temperature (relative shift, FWHM, area)
     viz.plot_temperature_trends(idata, series, save_path=out_path / "temperature_trends.png")
 
     # Trace Plot
@@ -205,7 +200,7 @@ def main(
     # Posterior Distributions & HDIs
     viz.plot_parameter_posteriors(
         idata=idata,
-        var_names=[v for v in ["e0_0", "de_dt", "gamma_0", "gamma_ac", "gamma_lo", "e_lo", "e_a", "eta"]
+        var_names=[v for v in ["e0_0", "a_te", "a_ep", "gamma_0", "gamma_ac", "gamma_lo", "e_lo", "eta"]
                    if v in idata.posterior],
         save_path=out_path / "posterior_hdi.png",
     )
@@ -216,45 +211,32 @@ def main(
 
 if __name__ == "__main__":
     SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-14_ST072_15_BA_n=4\tests"
-    BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_laser_on_0_4ns_480_766nm_50uW_294K_3rd_spot_3000gain_0.5s_100acc_2772t0_next_day.asc"   # Single shared background spectrum file
-    CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
+    BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_laser_on_0_4ns_480_766nm_50uW_294K_3rd_spot_3000gain_0.5s_100acc_2772t0_next_day.asc"
+    CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv"
 
-    # Initial peak centres (eV), ascending; the number of peaks follows this list. Five components: the two
-    # highest (1.934, 2.026) were stable across independent fits, the three lower ones are less well determined.
-    # (The original absorption-based four-peak guess was [1.75, 1.80, 1.93, 2.02].)
-    # ABSORPTION_PEAKS = [1.73, 1.84, 1.934, 2.026, 2.18]
+    # Initial peak centres (eV), ascending; the number of peaks follows this list.
     ABSORPTION_PEAKS = [1.730, 1.775, 1.937, 2.022]
-    # ABSORPTION_PEAKS = [1.84, 1.90, 1.934, 2.026]
 
-    # Prior overrides (None = DEFAULT_PRIORS in NUTS_sampler.py). Scalars apply to all peaks; per-peak
-    # parameters also accept one value per peak (length must equal the number of peaks above).
-    # Starting values derived from least-squares fits of this data set: component widths of ~65-100 meV,
-    # a thermal broadening that is NOT negligible, and an activation energy near 80 meV for the total intensity.
+    # Prior overrides (None = DEFAULT_PRIORS in NUTS_sampler.py).
+    # Note: Peaks 1 & 2 are separated by 45 meV, so e_ref_bound is kept at 15 meV on those two
+    # to prevent interval overlap and label switching between heavily convoluted peaks.
     PRIORS = {
-        "e_ref_sigma":        [8.0, 8.0, 8.0, 8.0],     # meV, ~3 sigma = +-10 nm
-        "de_dt_sigma":        [0.08, 0.15, 0.08, 0.08],  # meV/K
-        "gamma_0_median":     [60.0, 130.0, 78.0, 68.0], # meV (FWHM near 0 K)
-        "gamma_0_sigma_log":  0.2,  
+        "e_ref_sigma":        [6.0, 6.0, 8.0, 8.0],        # meV
+        "e_ref_bound":        [15.0, 15.0, 20.0, 20.0],    # meV (disjoint intervals)
+        "a_te_sigma":         [0.15, 0.15, 0.15, 0.15],    # meV/K (strictly > 0)
+        "a_ep_sigma":         [35.0, 35.0, 35.0, 35.0],    # meV (strictly < 0)
+        "gamma_0_median":     [60.0, 130.0, 78.0, 68.0],   # meV (FWHM near 0 K)
+        "gamma_0_sigma_log":  0.2,
         "gamma_ac_median":    0.05,  "gamma_ac_sigma_log": 0.6,
         "gamma_lo_median":    [29, 44, 22, 10],  "gamma_lo_sigma_log": 0.6,
         "e_lo_median":        15.0,  "e_lo_sigma_log":     0.15,
-        "i_0_median_log":     [2.83, 4.91, 2.83, 1.67],  # ln of areas ~ [17, 135, 17, 23, 5.3]
-        "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
+        "area_weights":       [17.0, 135.0, 17.0, 5.3],    # relative area ratios from least-squares fit
+        "area_sigma_log":     0.8,
         "baseline_sigma":     0.003,
     }
-    # PRIORS = {
-    #     "e_ref_sigma":       [40.0, 10.0, 10.0, 10.0],   # meV, tight on the two robust upper peaks
-    #     "de_dt_sigma":       0.15,                             # meV/K
-    #     "gamma_0_median":    [100.0, 70.0, 70, 65.0],  # meV
-    #     "gamma_0_sigma_log": 0.4,
-    #     "gamma_ac_median":   0.05,                             # meV/K
-    #     "gamma_ac_sigma_log": 0.8,
-    #     "gamma_lo_median":   50.0,                             # meV
-    #     "gamma_lo_sigma_log": 0.8,
-    #     "e_a_median":        80.0,                             # meV
-    #     "e_a_sigma_log":     0.5,
-    # }
-    LINESHAPE = "pseudo_voigt"   # or "gaussian"
+
+    # LINESHAPE = "pseudo_voigt"
+    LINESHAPE = "gaussian"
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.

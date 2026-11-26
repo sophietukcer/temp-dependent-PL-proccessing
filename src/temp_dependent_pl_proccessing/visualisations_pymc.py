@@ -53,11 +53,14 @@ def _param_names_in(idata: az.InferenceData, group: str) -> List[str]:
 def _spectrum_model(
     params: Mapping[str, Any], temperature: float, energy: np.ndarray, t_ref: float, idx: int
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """ model_components for spectrum number `idx`, picking that spectrum's baseline if the params have one. """
+    """ model_components for spectrum number `idx`, picking that spectrum's area and baseline. """
     p = dict(params)
+    area_all = np.asarray(p.pop("area"))
+    area_t = area_all[idx] if area_all.ndim == 2 else area_all
+
     baseline = p.pop("baseline", None)
     b = 0.0 if baseline is None else float(np.asarray(baseline).reshape(-1)[idx])
-    return model_components(p, temperature, energy, t_ref, baseline=b)
+    return model_components(p, temperature, energy, t_ref, area_t=area_t, baseline=b)
 
 
 def posterior_mean_params(idata: az.InferenceData, group: str = "posterior") -> Dict[str, np.ndarray]:
@@ -104,7 +107,8 @@ def _spectrum_grid(
 # --------------------------------------------------------------------------------------
 # Spectral plots
 # --------------------------------------------------------------------------------------
-colours = ["#FFCBE1", "#B2D9FF", "#C1FFC1", "#FFF3B2", "#E0B2FF"]  
+colours = ["#003F5C", "#58508D", "#BC5090", "#FFA600", "#E0B2FF"]
+
 
 def plot_spectral_fits(
     processed_series: Sequence[Mapping[str, Any]],
@@ -120,8 +124,8 @@ def plot_spectral_fits(
     draws - list of parameter draws (see sample_param_draws). Their spectra are drawn as a faint band and,
         when `params` is None, the CENTRAL curves are the pointwise MEDIAN of the draws' spectra.
         Never plot the model at posterior-MEAN parameters: the model is nonlinear and the posterior is
-        correlated/skewed (e.g. i_0 vs ln_q_ref), so the mean-parameter spectrum can be far from the data
-        even when every individual draw fits well.
+        correlated/skewed, so the mean-parameter spectrum can be far from the data even when every
+        individual draw fits well.
     """
     if params is None and not draws:
         raise ValueError("Provide either `params` (point estimate) or `draws`.")
@@ -147,7 +151,7 @@ def plot_spectral_fits(
 
         if show_components:
             for k in range(comps.shape[1]):
-                ax.fill_between(energy, comps[:, k], lw=1.0, color=colours[k], alpha=0.5, label=f"Peak {k + 1}", zorder=3)
+                ax.fill_between(energy, comps[:, k], lw=1.0, color=colours[k], alpha=0.5, label=f"n = {4-k}", zorder=3)
         ax.plot(energy, total, color="k", lw=1.4, label="total", zorder=4)
         ax.set_title(f"{temperature:g} K", fontsize=10)
 
@@ -155,7 +159,7 @@ def plot_spectral_fits(
         ax_res.plot(energy, data - total, ".", ms=2, color="C3")
         ax_res.set_xlabel("Energy (eV)")
 
-    axes[0][0].legend(fontsize=7, loc="upper right", frameon= False)
+    axes[0][0].legend(fontsize=7, loc="upper right", frameon=False)
     axes[0][0].set_ylabel("Norm. intensity")
     return _finish(fig, save_path)
 
@@ -193,29 +197,36 @@ def plot_temperature_trends(
     save_path: Optional[Union[str, Path]] = None,
     hdi_prob: float = 0.94,
 ) -> plt.Figure:
-    """ Posterior median and credible band of peak centre, FWHM and area vs temperature, per peak. """
+    """ Posterior median and credible band of relative peak shift, FWHM and area vs temperature, per peak. """
     temps = np.array([float(d["temperature"]) for d in processed_series])
+    min_idx = int(np.argmin(temps))
+    t_min = temps[min_idx]
+
     lo_q, hi_q = 50.0 * (1.0 - hdi_prob), 100.0 - 50.0 * (1.0 - hdi_prob)
     panels = [
-        ("e_centre", "Peak centre (meV)", False),
-        ("fwhm", "FWHM (meV)", False),
-        ("area", "Integrated area (norm. intensity * meV)", True),
+        ("e_centre", f"Peak shift ΔE from {t_min:g} K (meV)", False, True),
+        ("fwhm", "FWHM (meV)", False, False),
+        ("area", "Integrated area (norm. intensity * meV)", True, False),
     ]
     flat = _flatten_draws(idata, [p[0] for p in panels])
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
-    for ax, (var, label, log_y) in zip(axes, panels):
+    for ax, (var, label, log_y, relative_to_min) in zip(axes, panels):
         samples = flat[var]  # (n_samples, n_spectra, n_peaks)
+        if relative_to_min:
+            samples = samples - samples[:, min_idx : min_idx + 1, :]
+            ax.axhline(0.0, color="0.5", ls="--", lw=0.8)
+
         median = np.median(samples, axis=0)
         lo, hi = np.percentile(samples, [lo_q, hi_q], axis=0)
         for k in range(samples.shape[2]):
-            ax.plot(temps, median[:, k], "-o", ms=3, color=colours[k], label=f"Peak {k + 1}")
-            ax.fill_between(temps, lo[:, k], hi[:, k], color=colours[k], alpha=0.25)
+            ax.plot(temps, median[:, k], "-o", ms=3, color=colours[k], label=f"n = {4-k}")
+            ax.fill_between(temps, lo[:, k], hi[:, k], color=colours[k], alpha=0.4)
         ax.set_xlabel("Temperature (K)")
         ax.set_ylabel(label)
         if log_y:
             ax.set_yscale("log")
-    axes[0].legend(fontsize=8, frameon=False, loc="upper left")
+    axes[0].legend(fontsize=8, frameon=False, loc="lower left")
     fig.tight_layout()
     return _finish(fig, save_path)
 
@@ -254,7 +265,7 @@ def plot_pymc_corner(
     """
     Pair plot with divergent transitions highlighted. Use `coords={"peak": ["Peak 1"]}` to restrict
     per-peak parameters to one peak and keep the grid small. Look for ridges/funnels among
-    gamma_ac, gamma_lo and e_lo, and between e_a and ln_q_ref.
+    a_te, a_ep, gamma_ac, gamma_lo and e_lo.
     """
     axes = az.plot_pair(
         idata,
