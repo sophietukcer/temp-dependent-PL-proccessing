@@ -26,9 +26,9 @@ DEFAULT_PRIORS: Dict[str, Any] = {
     "e_ref_sigma": 8.0,         # meV, prior width around initial centers
     "e_ref_bound": 20.0,        # meV, hard +- bound around each initial center (prevents label switching)
     "a_te_mu": 0.0,             # meV/K, thermal expansion shift coefficient prior mean
-    "a_te_sigma": 0.2,          # meV/K, thermal expansion shift coefficient prior width
+    "a_te_sigma": 0.15,          # meV/K, thermal expansion shift coefficient prior width
     "a_ep_mu": 0.0,             # meV, electron-phonon renormalization weight prior mean
-    "a_ep_sigma": 40.0,         # meV, electron-phonon renormalization weight prior width
+    "a_ep_sigma": 35.0,         # meV, electron-phonon renormalization weight prior width
     "gamma_0_median": 40.0,     # meV, inhomogeneous FWHM
     "gamma_0_sigma_log": 0.35,
     "gamma_ac_median": 0.015,   # meV/K, acoustic coupling
@@ -122,8 +122,15 @@ def build_pl_pymc_model(
                     upper=centers_mev + pri["e_ref_bound"],
                     dims="peak",
                 )
-        a_te = pm.Normal("a_te", mu=pri["a_te_mu"], sigma=pri["a_te_sigma"], dims="peak")  # meV/K
-        a_ep = pm.Normal("a_ep", mu=pri["a_ep_mu"], sigma=pri["a_ep_sigma"], dims="peak")  # meV
+        # a_te = pm.Normal("a_te", mu=pri["a_te_mu"], sigma=pri["a_te_sigma"], dims="peak")  # meV/K
+        # a_ep = pm.Normal("a_ep", mu=pri["a_ep_mu"], sigma=pri["a_ep_sigma"], dims="peak")  # meV
+
+        # Strictly positive thermal expansion coefficient (meV/K)
+        a_te = pm.HalfNormal("a_te", sigma=pri["a_te_sigma"], dims="peak")
+
+        # Strictly negative electron-phonon renormalization weight (meV)
+        a_ep_mag = pm.HalfNormal("a_ep_mag", sigma=pri["a_ep_sigma"], dims="peak")
+        a_ep = pm.Deterministic("a_ep", -a_ep_mag, dims="peak")
 
         # Extrapolated 0 K centre: E(0) = E_ref - a_te * T_ref + a_ep * (1 - 2 / (exp(e_lo / kT_ref) - 1))
         bose_ref = 1.0 / pt.expm1(e_lo / (KB_MEV * t_ref))
