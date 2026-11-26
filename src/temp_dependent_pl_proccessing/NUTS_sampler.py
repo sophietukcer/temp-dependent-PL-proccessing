@@ -2,7 +2,6 @@
 NUTS_sampler.py
 ---------------
 PyMC model for temperature-dependent PL fitting of overlapping emission peaks (Gaussian or pseudo-Voigt).
-
 """
 
 from typing import Any, Dict, List, Mapping, Optional
@@ -13,6 +12,7 @@ import pytensor.tensor as pt
 from pymc.distributions.transforms import ordered
 
 from temp_dependent_pl_proccessing.pl_physics import (
+    KB_MEV,
     compute_t_ref,
     peak_physics,
     peak_profiles,
@@ -23,32 +23,32 @@ _trapezoid = getattr(np, "trapezoid", None) or np.trapz  # numpy >= 2 renamed tr
 # Prior hyper-parameters. Override any of them via build_pl_pymc_model(priors={...}).
 # Every entry may be a scalar or, for per-peak parameters, a list with one value per peak.
 DEFAULT_PRIORS: Dict[str, Any] = {
-    "e_ref_sigma": 40.0,        # meV, width of the prior on each peak centre at T_ref
-    "de_dt_sigma": 0.3,         # meV/K, centre shift (zero-mean, either sign)
+    "e_ref_sigma": 8.0,         # meV, prior width around initial centers
+    "e_ref_bound": 20.0,        # meV, hard +- bound around each initial center (prevents label switching)
+    "a_te_mu": 0.0,             # meV/K, thermal expansion shift coefficient prior mean
+    "a_te_sigma": 0.15,          # meV/K, thermal expansion shift coefficient prior width
+    "a_ep_mu": 0.0,             # meV, electron-phonon renormalization weight prior mean
+    "a_ep_sigma": 35.0,         # meV, electron-phonon renormalization weight prior width
     "gamma_0_median": 40.0,     # meV, inhomogeneous FWHM
-    "gamma_0_sigma_log": 0.5,
-    "gamma_ac_median": 0.05,    # meV/K, acoustic coupling
-    "gamma_ac_sigma_log": 1.0,
-    "gamma_lo_median": 30.0,    # meV, optical coupling
-    "gamma_lo_sigma_log": 0.7,
-    "e_lo_median": 30.0,        # meV, LO phonon energy (shared by all peaks)
+    "gamma_0_sigma_log": 0.35,
+    "gamma_ac_median": 0.015,   # meV/K, acoustic coupling
+    "gamma_ac_sigma_log": 0.6,
+    "gamma_lo_median": 40.0,    # meV, optical coupling
+    "gamma_lo_sigma_log": 0.6,
+    "e_lo_median": 35.0,        # meV, LO phonon energy (shared by all peaks)
     "e_lo_sigma_log": 0.3,
-    "i_0_median_log": 0.5,
-    "i_0_sigma_log": 1.0,       # median is set from the lowest-T spectrum area
-    "e_a_median": 40.0,         # meV, activation energy
-    "e_a_sigma_log": 0.5,
-    "ln_q_ref_sigma": 1.5,      # ln(quenched/radiative) at T_ref
-    "noise_frac": 0.02,         # HalfNormal scale of the per-spectrum noise FLOOR, as a fraction of max intensity
-    "noise_rel_sigma": 0.02,    # HalfNormal scale of rel_err (noise + model error as a fraction of the signal)
-    "baseline_mu": 0.035,       # Normal(mu, sigma) constant offset per spectrum (normalised units)
-    "baseline_sigma": 0.01,     # width of the prior on the constant offset
-    "bg_amp_sigma": 0.1,        # HalfNormal scale (fraction of y_max) for per-spectrum exp background amplitude
-    "bg_decay_median": 125.0,   # meV, shared exponential background decay length
-    "bg_decay_sigma_log": 0.2,  # log-normal width for shared exponential background decay length
-    "eta_alpha": 2.0,           # Beta(alpha, beta) prior on the Lorentzian fraction eta (pseudo-Voigt only);
-    "eta_beta": 3.0,            # Beta(2, 2) = mild preference for a mixture, density -> 0 at eta = 0 and 1
+    "area_sigma_log": 0.8,      # log-normal width for free per-spectrum, per-peak areas
+    "noise_frac": 0.01,         # HalfNormal scale of the per-spectrum noise FLOOR
+    "noise_rel_sigma": 0.015,   # HalfNormal scale of rel_err
+    "baseline_mu": 0.03,        # Normal(mu, sigma) constant offset per spectrum
+    "baseline_sigma": 0.005,    # width of the prior on the constant offset
+    "bg_frac_alpha": 6.0,       # Beta(alpha, beta) for bg_amp / (y_at_emin - baseline), strictly in (0, 1)
+    "bg_frac_beta": 2.0,
+    "bg_decay_median": 45.0,    # meV, shared exponential background decay length
+    "bg_decay_sigma_log": 0.25, # log-normal width for shared exponential background decay length
+    "eta_alpha": 2.0,           # Beta(alpha, beta) prior on the Lorentzian fraction eta
+    "eta_beta": 2.0,
 }
-
 
 def build_pl_pymc_model(
     processed_series: List[Dict],
@@ -94,11 +94,15 @@ def build_pl_pymc_model(
     t_ref = compute_t_ref(processed_series)
 
     # Data-driven SCALES for priors and reference energy (never the likelihood):
-    low = processed_series[int(np.argmin(temps))]
-    area_low = float(_trapezoid(np.asarray(low["intensity"]), np.asarray(low["energy_ev"]) * 1e3))
-    area_low = max(area_low, 1e-3)
+    spec_areas = np.array([
+        max(float(_trapezoid(np.asarray(d["intensity"]), np.asarray(d["energy_ev"]) * 1e3)), 1e-3)
+        for d in processed_series
+    ])
+    area_init_mu = np.log(spec_areas[:, None] / num_peaks)  # shape (n_spectra, 1) -> broadcasts to (spectrum, peak)
+
     y_max = float(max(np.max(d["intensity"]) for d in processed_series))
     e_min_mev = float(min(np.min(d["energy_ev"]) for d in processed_series)) * 1e3
+    y_at_emin = np.array([float(d["intensity"][0]) for d in processed_series], dtype=np.float64)
 
     coords = {
         "peak": [f"Peak {i + 1}" for i in range(num_peaks)],
@@ -106,13 +110,35 @@ def build_pl_pymc_model(
     }
 
     with pm.Model(coords=coords) as model:
-        # ---- peak centre: linear (high-T Varshni limit), anchored at T_ref -------------------------
-        e_ref = pm.Normal(
-            "e_ref", mu=centers_mev, sigma=pri["e_ref_sigma"], dims="peak",
-            transform=ordered, initval=centers_mev,
+        # ---- LO phonon energy (shared lattice property across shift and broadening) ----------------
+        e_lo = pm.LogNormal("e_lo", mu=np.log(pri["e_lo_median"]), sigma=pri["e_lo_sigma_log"])
+
+        # ---- peak centre: thermal expansion + Bose-Einstein phonon interaction, anchored at T_ref --
+        e_ref = pm.TruncatedNormal(
+                    "e_ref",
+                    mu=centers_mev,
+                    sigma=pri["e_ref_sigma"],
+                    lower=centers_mev - pri["e_ref_bound"],
+                    upper=centers_mev + pri["e_ref_bound"],
+                    dims="peak",
+                )
+        # a_te = pm.Normal("a_te", mu=pri["a_te_mu"], sigma=pri["a_te_sigma"], dims="peak")  # meV/K
+        # a_ep = pm.Normal("a_ep", mu=pri["a_ep_mu"], sigma=pri["a_ep_sigma"], dims="peak")  # meV
+
+        # Strictly positive thermal expansion coefficient (meV/K)
+        a_te = pm.HalfNormal("a_te", sigma=pri["a_te_sigma"], dims="peak")
+
+        # Strictly negative electron-phonon renormalization weight (meV)
+        a_ep_mag = pm.HalfNormal("a_ep_mag", sigma=pri["a_ep_sigma"], dims="peak")
+        a_ep = pm.Deterministic("a_ep", -a_ep_mag, dims="peak")
+
+        # Extrapolated 0 K centre: E(0) = E_ref - a_te * T_ref + a_ep * (1 - 2 / (exp(e_lo / kT_ref) - 1))
+        bose_ref = 1.0 / pt.expm1(e_lo / (KB_MEV * t_ref))
+        pm.Deterministic(
+            "e0_0",
+            e_ref - a_te * t_ref + a_ep * (1.0 - 2.0 * bose_ref),
+            dims="peak",
         )
-        de_dt = pm.Normal("de_dt", mu=0.0, sigma=pri["de_dt_sigma"], dims="peak")  # meV/K, blueshift > 0
-        pm.Deterministic("e0_0", e_ref - de_dt * t_ref, dims="peak")  # extrapolated 0 K centre (meV)
 
         # ---- FWHM: inhomogeneous + acoustic + LO phonon (meV) --------------------------------------
         gamma_0 = pm.LogNormal(
@@ -124,21 +150,19 @@ def build_pl_pymc_model(
         gamma_lo = pm.LogNormal(
             "gamma_lo", mu=np.log(pri["gamma_lo_median"]), sigma=pri["gamma_lo_sigma_log"], dims="peak"
         )
-        # LO phonon energy is a lattice property: ONE value shared by all peaks.
-        e_lo = pm.LogNormal("e_lo", mu=np.log(pri["e_lo_median"]), sigma=pri["e_lo_sigma_log"])
 
         # ---- lineshape: Lorentzian fraction per peak (pseudo-Voigt only) ---------------------------
         eta = None
         if lineshape == "pseudo_voigt":
             eta = pm.Beta("eta", alpha=pri["eta_alpha"], beta=pri["eta_beta"], dims="peak")
 
-        # ---- thermal quenching (Arrhenius), parametrised at T_ref ----------------------------------
-        i_0 = pm.LogNormal(
-            # "i_0", mu=np.log(area_low / num_peaks), sigma=pri["i_0_sigma_log"], dims="peak"
-            "i_0", mu=pri["i_0_median_log"], sigma=pri["i_0_sigma_log"], dims="peak"
+        # ---- free peak areas across temperatures ---------------------------------------------------
+        area = pm.LogNormal(
+            "area",
+            mu=pri.get("area_median_log", area_init_mu),
+            sigma=pri["area_sigma_log"],
+            dims=("spectrum", "peak"),
         )
-        e_a = pm.LogNormal("e_a", mu=np.log(pri["e_a_median"]), sigma=pri["e_a_sigma_log"], dims="peak")
-        ln_q_ref = pm.Normal("ln_q_ref", mu=0.0, sigma=pri["ln_q_ref_sigma"], dims="peak")
 
         # ---- noise: per-spectrum floor + a relative term (signal-proportional noise and model error) ----
         sigma = pm.HalfNormal("sigma", sigma=pri["noise_frac"] * y_max, dims="spectrum")
@@ -147,42 +171,42 @@ def build_pl_pymc_model(
 
         # ---- baseline: constant offset + exponential decay background ------------------------------
         if fit_baseline:
-            baseline = pm.Normal(
-                "baseline", mu=pri["baseline_mu"], sigma=pri["baseline_sigma"], dims="spectrum"
-            )
-            bg_decay = pm.LogNormal(
-                "bg_decay", mu=np.log(pri["bg_decay_median"]), sigma=pri["bg_decay_sigma_log"]
-            )
-            bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max, dims="spectrum")
-            # bg_amp = pm.HalfNormal("bg_amp", sigma=pri["bg_amp_sigma"] * y_max)
-
+                    baseline = pm.Normal(
+                        "baseline", mu=pri["baseline_mu"], sigma=pri["baseline_sigma"], dims="spectrum"
+                    )
+                    bg_decay = pm.LogNormal(
+                        "bg_decay", mu=np.log(pri["bg_decay_median"]), sigma=pri["bg_decay_sigma_log"]
+                    )
+                    bg_frac = pm.Beta(
+                        "bg_frac", alpha=pri["bg_frac_alpha"], beta=pri["bg_frac_beta"], dims="spectrum"
+                    )
+                    bg_amp = pm.Deterministic(
+                        "bg_amp", bg_frac * pt.maximum(y_at_emin - baseline, 1e-4), dims="spectrum"
+                    )
 
         params: Dict[str, Any] = {
-            "e_ref": e_ref, "de_dt": de_dt, "gamma_0": gamma_0, "gamma_ac": gamma_ac,
-            "gamma_lo": gamma_lo, "e_lo": e_lo, "i_0": i_0, "e_a": e_a, "ln_q_ref": ln_q_ref,
+            "e_ref": e_ref, "a_te": a_te, "a_ep": a_ep,
+            "gamma_0": gamma_0, "gamma_ac": gamma_ac, "gamma_lo": gamma_lo, "e_lo": e_lo,
         }
 
         # ---- forward model + likelihood ------------------------------------------------------------
-        centres_t, fwhm_t, area_t_all = [], [], []
+        centres_t, fwhm_t = [], []
         for idx, entry in enumerate(processed_series):
             t_val = temps[idx]
             e_col = np.asarray(entry["energy_ev"], dtype=np.float64)[:, None] * 1e3  # (N, 1) in meV
             y_obs = np.asarray(entry["intensity"], dtype=np.float64)
 
-            e_t, gamma_t, area_t = peak_physics(t_val, t_ref, params, pt.exp, pt.expm1)
+            e_t, gamma_t = peak_physics(t_val, t_ref, params, pt.expm1)
+            area_t = area[idx]
             profiles = peak_profiles(e_col, e_t, gamma_t, area_t, pt.exp, eta=eta)
 
             spectrum_mu = pt.sum(profiles, axis=1)
             if fit_baseline:
                 e_mev = e_col[:, 0]
                 bg_exp = bg_amp[idx] * pt.exp(-(e_mev - e_min_mev) / bg_decay)
-                # bg_exp = bg_amp * pt.exp(-(e_mev - e_min_mev) / bg_decay)
-
-
                 spectrum_mu = spectrum_mu + baseline[idx] + bg_exp
 
             if relative_noise:
-                # y_obs is data (a constant), so sd_i is a fixed weight per point; 1e-12 keeps sqrt differentiable.
                 sd_i = pt.sqrt(sigma[idx] ** 2 + (rel_err * np.clip(y_obs, 0.0, None)) ** 2 + 1e-12)
             else:
                 sd_i = sigma[idx]
@@ -195,11 +219,9 @@ def build_pl_pymc_model(
             )
             centres_t.append(e_t)
             fwhm_t.append(gamma_t)
-            area_t_all.append(area_t)
 
         # Derived quantities per (spectrum, peak) for plotting physical trends vs T.
         pm.Deterministic("e_centre", pt.stack(centres_t, axis=0), dims=("spectrum", "peak"))
         pm.Deterministic("fwhm", pt.stack(fwhm_t, axis=0), dims=("spectrum", "peak"))
-        pm.Deterministic("area", pt.stack(area_t_all, axis=0), dims=("spectrum", "peak"))
 
     return model

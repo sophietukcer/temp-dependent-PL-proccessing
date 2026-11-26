@@ -16,15 +16,14 @@ from temp_dependent_pl_proccessing.NUTS_sampler import DEFAULT_PRIORS
 
 # Physical parameters reported in the convergence summary and plots.
 TARGET_PARAMS = [
-    "e_ref", "de_dt", "e0_0",
+    "e_ref", "a_te", "a_ep", "e0_0",
     "gamma_0", "gamma_ac", "gamma_lo", "e_lo",
-    "i_0", "e_a", "ln_q_ref", "eta",
-    "sigma", "rel_err", "baseline", "bg_amp", "bg_decay",
+    "eta", "sigma", "rel_err", "baseline", "bg_amp", "bg_decay",
 ]
 # Quantities that ARE identified even from a single spectrum (used for health checks of 1-temperature runs).
 DERIVED_PARAMS = ["e_centre", "fwhm", "area", "sigma", "rel_err", "baseline", "bg_amp", "bg_decay"]
 # Parameters most prone to ridges/funnels; used for the divergence-highlighted pair plot.
-PAIR_PARAMS = ["gamma_0", "gamma_ac", "gamma_lo", "e_lo", "e_a", "ln_q_ref"]
+PAIR_PARAMS = ["a_te", "a_ep", "gamma_0", "gamma_ac", "gamma_lo", "e_lo"]
 
 
 def setup_logger(config_path: Union[str, Path] = "logger_config.py", log_level="INFO", log_file=None) -> logging.Logger:
@@ -206,18 +205,18 @@ def main(
 
     # Posterior Distributions & HDIs
     viz.plot_parameter_posteriors(
-        idata=idata,
-        var_names=[v for v in ["e0_0", "de_dt", "gamma_0", "gamma_ac", "gamma_lo", "e_lo", "e_a", "eta"]
-                   if v in idata.posterior],
-        save_path=out_path / "posterior_hdi.png",
-    )
+            idata=idata,
+            var_names=[v for v in ["e0_0", "a_te", "a_ep", "gamma_0", "gamma_ac", "gamma_lo", "e_lo", "eta"]
+                    if v in idata.posterior],
+            save_path=out_path / "posterior_hdi.png",
+        )
 
     logger.info(f"Pipeline finished. All figures and outputs saved to '{out_path.resolve()}'.")
     return result
 
 
 if __name__ == "__main__":
-    SAMPLES_DIR = r"E:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\first wavelengths\test"
+    SAMPLES_DIR = r"G:\My Drive\Data\temp dependent PL\26-10-13_ST072_FPEA_BA_n=4\26-10-13_ST072_34A_FPEA_n=4\first wavelengths\test"
     BACKGROUND_FILE = Path(SAMPLES_DIR) / "bg_0_4ns_480_766nm_50uW_different_spot_3000gain_0.5s_100acc_2771t0_.asc"   # Single shared background spectrum file
     CALIBRATION_FILE = Path(SAMPLES_DIR) / "iCCD_355_correction.csv" # Single shared response calibration spectrum file
 
@@ -225,7 +224,7 @@ if __name__ == "__main__":
     # highest (1.934, 2.026) were stable across independent fits, the three lower ones are less well determined.
     # (The original absorption-based four-peak guess was [1.75, 1.80, 1.93, 2.02].)
     # ABSORPTION_PEAKS = [1.73, 1.84, 1.934, 2.026, 2.18]
-    ABSORPTION_PEAKS = [1.93, 2.03, 2.2, 2.4]
+    ABSORPTION_PEAKS = [1.93, 2.04, 2.18, 2.41]
     # ABSORPTION_PEAKS = [1.84, 1.90, 1.934, 2.026]
 
     # Prior overrides (None = DEFAULT_PRIORS in NUTS_sampler.py). Scalars apply to all peaks; per-peak
@@ -233,17 +232,21 @@ if __name__ == "__main__":
     # Starting values derived from least-squares fits of this data set: component widths of ~65-100 meV,
     # a thermal broadening that is NOT negligible, and an activation energy near 80 meV for the total intensity.
     PRIORS = {
-        "e_ref_sigma":        [8.0, 8.0, 8.0, 8.0],     # meV, ~3 sigma = +-10 nm
-        "de_dt_sigma":        [0.08, 0.15, 0.08, 0.08],  # meV/K
-        "gamma_0_median":     [45, 55, 68, 68.0], # meV (FWHM near 0 K)
-        "gamma_0_sigma_log":  0.2,  
-        "gamma_ac_median":    0.015,  "gamma_ac_sigma_log": 0.5,
-        "gamma_lo_median":    60,  "gamma_lo_sigma_log": 0.5,
-        "e_lo_median":        35.0,  "e_lo_sigma_log":     0.25,
-        "i_0_median_log":     [4, 4, 4, 1],  # ln of areas 
-        "i_0_sigma_log":      [0.4, 0.25, 0.4, 0.3],
-        "baseline_sigma":     0.01,
-    }
+            "e_ref_sigma":        [6.0, 6.0, 6.0, 8.0],
+            "e_ref_bound":        [18.0, 18.0, 18.0, 25.0],
+            "a_te_sigma":         [0.15, 0.15, 0.15, 0.15],
+            "a_ep_sigma":         [35.0, 35.0, 35.0, 35.0],
+            "gamma_0_median":     [45.0, 50.0, 55.0, 65.0],
+            "gamma_0_sigma_log":  0.3,
+            "gamma_ac_median":    0.015, "gamma_ac_sigma_log": 0.5,
+            "gamma_lo_median":    50.0,  "gamma_lo_sigma_log": 0.5,
+            "e_lo_median":        35.0,  "e_lo_sigma_log":     0.25,
+            "area_sigma_log":     0.8,
+            "baseline_mu":        0.03,
+            "baseline_sigma":     0.005,
+            "bg_decay_median":    45.0,
+            "bg_decay_sigma_log": 0.25,
+        }
     # PRIORS = {
     #     "e_ref_sigma":       [40.0, 10.0, 10.0, 10.0],   # meV, tight on the two robust upper peaks
     #     "de_dt_sigma":       0.15,                             # meV/K
@@ -256,12 +259,13 @@ if __name__ == "__main__":
     #     "e_a_median":        80.0,                             # meV
     #     "e_a_sigma_log":     0.5,
     # }
-    LINESHAPE = "pseudo_voigt" 
-    # LINESHAPE = "gaussian"
+    # LINESHAPE = "pseudo_voigt" 
+    LINESHAPE = "gaussian"
 
     # Fit only the lowest-temperature spectrum first to validate the 4-peak decomposition,
     # e.g. TEMPERATURE_SUBSET = [100]. None = fit all temperatures.
-    TEMPERATURE_SUBSET = [125, 150, 175, 200, 225]
+    # TEMPERATURE_SUBSET = [125, 150, 175, 200, 225]
+    TEMPERATURE_SUBSET = None
 
     main(samples_dir=SAMPLES_DIR,
          bckg_file=BACKGROUND_FILE,

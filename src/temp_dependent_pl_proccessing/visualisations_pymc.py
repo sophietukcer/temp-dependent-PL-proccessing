@@ -59,18 +59,21 @@ def _spectrum_model(
     idx: int,
     e_min_mev: Optional[float] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """ model_components for spectrum number `idx`, picking that spectrum's baseline/background if present. """
+    """ model_components for spectrum number `idx`, picking that spectrum's area and baseline/background. """
     p = dict(params)
+    area_all = np.asarray(p.pop("area"))
+    area_t = area_all[idx] if area_all.ndim == 2 else area_all
+
     baseline = p.pop("baseline", None)
     bg_amp = p.pop("bg_amp", None)
     bg_decay = p.pop("bg_decay", None)
     b = 0.0 if baseline is None else float(np.asarray(baseline).reshape(-1)[idx])
     amp = 0.0 if bg_amp is None else float(np.asarray(bg_amp).reshape(-1)[idx])
-    # amp = 0.0 if bg_amp is None else bg_amp
-
     decay = None if bg_decay is None else float(np.asarray(bg_decay))
+
     return model_components(
         p, temperature, energy, t_ref,
+        area_t=area_t,
         baseline=b, bg_amp=amp, bg_decay=decay, e_min_mev=e_min_mev,
     )
 
@@ -119,7 +122,7 @@ def _spectrum_grid(
 # --------------------------------------------------------------------------------------
 # Spectral plots
 # --------------------------------------------------------------------------------------
-colours = ["#FFCBE1", "#B2D9FF", "#C1FFC1", "#FFF3B2", "#E0B2FF"]  
+colours = ["#003F5C", "#58508D", "#BC5090", "#FFA600", "#FF6361"]  
 
 def plot_spectral_fits(
     processed_series: Sequence[Mapping[str, Any]],
@@ -167,12 +170,12 @@ def plot_spectral_fits(
 
         if show_components:
             for k in range(comps.shape[1]):
-                ax.fill_between(energy, comps[:, k], lw=1.0, color=colours[k], alpha=0.5, label=f"Peak {k + 1}", zorder=3)
+                ax.fill_between(energy, comps[:, k], lw=1.0, color=colours[k], alpha=0.5, label=f"n={4-k}", zorder=3)
             if np.any(bg != 0.0):
                 ax.plot(energy, bg, "--", color="0.35", lw=1.0, label="background", zorder=3.5)
         ax.plot(energy, total, color="k", lw=1.4, label="total", zorder=4)
         ax.set_title(f"{temperature:g} K", fontsize=10)
-        # ax.set_xlim(-0.05, 1.05)
+        # ax.set_ylim(-0.05, 1.05)
         ax_res.axhline(0.0, color="k", lw=0.6)
         ax_res.plot(energy, data - total, ".", ms=2, color="C3")
         ax_res.set_xlabel("Energy (eV)")
@@ -216,29 +219,36 @@ def plot_temperature_trends(
     save_path: Optional[Union[str, Path]] = None,
     hdi_prob: float = 0.94,
 ) -> plt.Figure:
-    """ Posterior median and credible band of peak centre, FWHM and area vs temperature, per peak. """
+    """ Posterior median and credible band of relative peak shift, FWHM and area vs temperature, per peak. """
     temps = np.array([float(d["temperature"]) for d in processed_series])
+    min_idx = int(np.argmin(temps))
+    t_min = temps[min_idx]
+
     lo_q, hi_q = 50.0 * (1.0 - hdi_prob), 100.0 - 50.0 * (1.0 - hdi_prob)
     panels = [
-        ("e_centre", "Peak centre (meV)", False),
-        ("fwhm", "FWHM (meV)", False),
-        ("area", "Integrated area (norm. intensity * meV)", True),
+        ("e_centre", f"Peak shift ΔE from {t_min:g} K (meV)", False, True),
+        ("fwhm", "FWHM (meV)", False, False),
+        ("area", "Integrated area (norm. intensity * meV)", True, False),
     ]
     flat = _flatten_draws(idata, [p[0] for p in panels])
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
-    for ax, (var, label, log_y) in zip(axes, panels):
+    for ax, (var, label, log_y, relative_to_min) in zip(axes, panels):
         samples = flat[var]  # (n_samples, n_spectra, n_peaks)
+        if relative_to_min:
+            samples = samples - samples[:, min_idx : min_idx + 1, :]
+            ax.axhline(0.0, color="0.5", ls="--", lw=0.8)
+
         median = np.median(samples, axis=0)
         lo, hi = np.percentile(samples, [lo_q, hi_q], axis=0)
         for k in range(samples.shape[2]):
-            ax.plot(temps, median[:, k], "-o", ms=3, color=colours[k], label=f"Peak {k + 1}")
+            ax.plot(temps, median[:, k], "-o", ms=3, color=colours[k], label=f"n = {4-k}")
             ax.fill_between(temps, lo[:, k], hi[:, k], color=colours[k], alpha=0.25)
         ax.set_xlabel("Temperature (K)")
         ax.set_ylabel(label)
         if log_y:
             ax.set_yscale("log")
-    axes[0].legend(fontsize=8, frameon=False, loc="upper left")
+    axes[0].legend(fontsize=8, frameon=False, loc="lower left")
     fig.tight_layout()
     return _finish(fig, save_path)
 
