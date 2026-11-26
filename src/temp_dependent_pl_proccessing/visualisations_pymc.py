@@ -59,18 +59,21 @@ def _spectrum_model(
     idx: int,
     e_min_mev: Optional[float] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """ model_components for spectrum number `idx`, picking that spectrum's baseline/background if present. """
+    """ model_components for spectrum number `idx`, picking that spectrum's area and baseline/background. """
     p = dict(params)
+    area_all = np.asarray(p.pop("area"))
+    area_t = area_all[idx] if area_all.ndim == 2 else area_all
+
     baseline = p.pop("baseline", None)
     bg_amp = p.pop("bg_amp", None)
     bg_decay = p.pop("bg_decay", None)
     b = 0.0 if baseline is None else float(np.asarray(baseline).reshape(-1)[idx])
     amp = 0.0 if bg_amp is None else float(np.asarray(bg_amp).reshape(-1)[idx])
-    # amp = 0.0 if bg_amp is None else bg_amp
-
     decay = None if bg_decay is None else float(np.asarray(bg_decay))
+
     return model_components(
         p, temperature, energy, t_ref,
+        area_t=area_t,
         baseline=b, bg_amp=amp, bg_decay=decay, e_min_mev=e_min_mev,
     )
 
